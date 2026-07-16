@@ -74,12 +74,60 @@ const itemPhotos = {
   vodka: "https://images.pexels.com/photos/19841825/pexels-photo-19841825.jpeg?auto=compress&cs=tinysrgb&w=240&h=180&fit=crop"
 };
 
+const itemImageRules = [
+  { keys: ["chicken", "biryani"], photo: itemPhotos["chicken-biryani"] },
+  { keys: ["veg", "biryani"], photo: itemPhotos["veg-biryani"] },
+  { keys: ["chicken", "thali"], photo: itemPhotos["chicken-thali"] },
+  { keys: ["mutton", "thali"], photo: itemPhotos["mutton-thali"] },
+  { keys: ["veg", "thali"], photo: itemPhotos["veg-thali"] },
+  { keys: ["egg", "thali"], photo: itemPhotos["egg-thali"] },
+  { keys: ["chicken", "lollipop"], photo: itemPhotos["chicken-lollipop"] },
+  { keys: ["chicken", "fry"], photo: itemPhotos["chicken-fry"] },
+  { keys: ["chicken", "curry"], photo: itemPhotos["chicken-curry"] },
+  { keys: ["mutton", "sukka"], photo: itemPhotos["mutton-sukka"] },
+  { keys: ["mutton", "curry"], photo: itemPhotos["mutton-curry"] },
+  { keys: ["paneer", "chilli"], photo: itemPhotos["paneer-chilli"] },
+  { keys: ["paneer"], photo: itemPhotos["paneer-masala"] },
+  { keys: ["masala", "papad"], photo: itemPhotos["masala-papad"] },
+  { keys: ["egg", "curry"], photo: itemPhotos["egg-curry"] },
+  { keys: ["dal"], photo: itemPhotos["dal-fry"] },
+  { keys: ["jeera", "rice"], photo: itemPhotos["jeera-rice"] },
+  { keys: ["plain", "rice"], photo: itemPhotos["plain-rice"] },
+  { keys: ["tandoori", "roti"], photo: itemPhotos["tandoori-roti"] },
+  { keys: ["butter", "roti"], photo: itemPhotos["butter-roti"] },
+  { keys: ["chapati"], photo: itemPhotos.chapati },
+  { keys: ["naan"], photo: itemPhotos.naan },
+  { keys: ["water", "bottle"], photo: itemPhotos["water-bottle"] },
+  { keys: ["cold", "drink"], photo: itemPhotos["cold-drink"] },
+  { keys: ["lime", "soda"], photo: itemPhotos["lime-soda"] },
+  { keys: ["soda"], photo: itemPhotos.soda },
+  { keys: ["tea"], photo: itemPhotos.tea },
+  { keys: ["kingfisher"], photo: itemPhotos.kingfisher },
+  { keys: ["tuborg"], photo: itemPhotos.tuborg },
+  { keys: ["beer"], photo: itemPhotos.kingfisher },
+  { keys: ["old", "monk"], photo: itemPhotos.oldmonk },
+  { keys: ["rum"], photo: itemPhotos.oldmonk },
+  { keys: ["mcdowell"], photo: itemPhotos.mcwhisky },
+  { keys: ["royal", "stag"], photo: itemPhotos.royalstag },
+  { keys: ["blenders"], photo: itemPhotos.blenders },
+  { keys: ["signature"], photo: itemPhotos.signature },
+  { keys: ["whisky"], photo: itemPhotos.mcwhisky },
+  { keys: ["whiskey"], photo: itemPhotos.mcwhisky },
+  { keys: ["vodka"], photo: itemPhotos.vodka },
+  { keys: ["magic", "moments"], photo: itemPhotos.vodka },
+  { keys: ["biryani"], photo: itemPhotos["chicken-biryani"] },
+  { keys: ["thali"], photo: itemPhotos["veg-thali"] },
+  { keys: ["rice"], photo: itemPhotos["plain-rice"] },
+  { keys: ["roti"], photo: itemPhotos["tandoori-roti"] }
+];
+
 const menuKey = "hotelGuruMenu";
 const salesKey = "hotelGuruSales";
 const billCounterKey = "hotelGuruBillCounter";
 const tableOrdersKey = "hotelGuruTableOrders";
 const activeTableOrderKey = "hotelGuruActiveTableOrder";
 const savedReportsKey = "hotelGuruSavedReports";
+const reportResetHour = 2;
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 let items = loadMenu();
@@ -192,7 +240,13 @@ function saveActiveOrder() {
 
 function createTableOrder(tableLabel) {
   const id = `order-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const label = tableLabel.trim() || `Table ${Object.keys(loadTableOrders()).length + 1}`;
+  const existingNumbers = Object.values(loadTableOrders())
+    .map((order) => String(order.table || "").match(/\d+/))
+    .filter(Boolean)
+    .map((match) => Number(match[0]));
+  let nextTableNumber = 1;
+  while (existingNumbers.includes(nextTableNumber)) nextTableNumber += 1;
+  const label = tableLabel.trim() || `Table ${nextTableNumber}`;
   const order = {
     id,
     billNo: reserveBillNumber(),
@@ -257,9 +311,19 @@ function initializeTableOrders() {
   createTableOrder("Table 1");
 }
 
+function tableSortValue(order) {
+  const label = String(order.table || "");
+  const match = label.match(/\d+/);
+  return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+}
+
 function renderTableTabs() {
   const orders = loadTableOrders();
-  const entries = Object.values(orders).sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+  const entries = Object.values(orders).sort((a, b) => {
+    const numberDiff = tableSortValue(a) - tableSortValue(b);
+    if (numberDiff) return numberDiff;
+    return String(a.table || "").localeCompare(String(b.table || ""), undefined, { numeric: true, sensitivity: "base" });
+  });
   tableTabs.innerHTML = entries.length
     ? entries.map((order) => {
       const count = Object.values(order.quantities || {}).reduce((sum, quantity) => sum + Number(quantity || 0), 0);
@@ -285,8 +349,14 @@ function fallbackImage(item) {
   return item.kind === "liquor" ? bottleImage(item.color) : foodImage(item.color);
 }
 
+function keywordImage(item) {
+  const text = `${item.name || ""} ${item.id || ""} ${item.category || ""} ${item.subcategory || ""}`.toLowerCase();
+  const rule = itemImageRules.find((imageRule) => imageRule.keys.every((key) => text.includes(key)));
+  return rule?.photo || "";
+}
+
 function itemImage(item) {
-  return item.photo || itemPhotos[item.id] || fallbackImage(item);
+  return item.photo || itemPhotos[item.id] || keywordImage(item) || fallbackImage(item);
 }
 
 function drinkSubcategory(item) {
@@ -300,6 +370,14 @@ function drinkSubcategory(item) {
   return "Other";
 }
 
+function isSnackItem(item) {
+  return item.category === "Snacks" || item.category === "Starter";
+}
+
+function isFoodItem(item) {
+  return item.category !== "Drinks" && !isSnackItem(item);
+}
+
 function selectedItems() {
   return items.map((item) => ({ ...item, quantity: quantities.get(item.id) || 0 })).filter((item) => item.quantity > 0);
 }
@@ -307,10 +385,9 @@ function selectedItems() {
 function getTotals() {
   const selected = selectedItems();
   const subtotal = selected.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const serviceCharge = Math.round(subtotal * 0.05);
   const rate = Math.max(0, Number(gstRate.value) || 0);
-  const gstAmount = gstEnabled.checked ? Math.round((subtotal + serviceCharge) * (rate / 100)) : 0;
-  return { selected, subtotal, serviceCharge, gstRate: rate, gstAmount, grandTotal: subtotal + serviceCharge + gstAmount };
+  const gstAmount = gstEnabled.checked ? Math.round(subtotal * (rate / 100)) : 0;
+  return { selected, subtotal, serviceCharge: 0, gstRate: rate, gstAmount, grandTotal: subtotal + gstAmount };
 }
 
 function passesFilter(item) {
@@ -319,7 +396,8 @@ function passesFilter(item) {
   if (query && !text.includes(query)) return false;
   if (activeFilter === "all") return true;
   if (activeFilter === "Drinks") return item.category === "Drinks" && (activeDrinkSubfilter === "all" || drinkSubcategory(item) === activeDrinkSubfilter);
-  if (activeFilter === "Food") return activeSubfilter === "all" ? item.category !== "Drinks" : item.category === activeSubfilter;
+  if (activeFilter === "Snacks") return isSnackItem(item);
+  if (activeFilter === "Food") return activeSubfilter === "all" ? isFoodItem(item) : item.category === activeSubfilter;
   return true;
 }
 
@@ -330,7 +408,7 @@ function renderItems() {
       <article class="item-card">
         <img class="item-image" src="${itemImage(item)}" alt="${item.name}" data-fallback="${fallbackImage(item)}" />
         <div class="item-detail">
-          <span class="item-category">${item.category === "Drinks" ? drinkSubcategory(item) : item.category}</span>
+          <span class="item-category">${item.category === "Drinks" ? drinkSubcategory(item) : isSnackItem(item) ? "Snacks" : item.category}</span>
           <h3>${item.name}</h3>
           <span class="item-price">${currency.format(item.price)}</span>
           <div class="qty-row" aria-label="${item.name} quantity">
@@ -372,7 +450,7 @@ function renderBill() {
     : '<p class="empty-state">Add quantity to start billing.</p>';
 
   subtotalEl.textContent = currency.format(totals.subtotal);
-  serviceChargeEl.textContent = currency.format(totals.serviceCharge);
+  if (serviceChargeEl) serviceChargeEl.textContent = currency.format(0);
   gstRow.hidden = !gstEnabled.checked;
   gstLabel.textContent = `GST ${totals.gstRate}%`;
   gstAmountEl.textContent = currency.format(totals.gstAmount);
@@ -415,7 +493,6 @@ function receiptHtml(bill) {
       <table><tbody>${rows}</tbody></table>
       <div class="receipt-totals">
         <p><span>Subtotal</span><strong>${currency.format(bill.subtotal)}</strong></p>
-        <p><span>Service 5%</span><strong>${currency.format(bill.serviceCharge)}</strong></p>
         ${bill.gstEnabled ? `<p><span>GST ${bill.gstRate}%</span><strong>${currency.format(bill.gstAmount)}</strong></p>` : ""}
         <p class="receipt-grand"><span>Total</span><strong>${currency.format(bill.grandTotal)}</strong></p>
       </div>
@@ -425,6 +502,115 @@ function receiptHtml(bill) {
 
 function fullReceiptHtml(bill) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${bill.billNo}</title><style>body{font-family:Arial;padding:24px}.receipt{max-width:420px;margin:auto}.receipt h2{text-align:center}.receipt>p,.receipt footer{text-align:center}.receipt-meta{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;border-top:1px solid #999;border-bottom:1px solid #999;padding:10px 0;margin:14px 0}table{width:100%;border-collapse:collapse}td{padding:8px 0;border-bottom:1px dashed #bbb}td:last-child{text-align:right;font-weight:800}small{display:block;color:#555}.receipt-totals p{display:flex;justify-content:space-between}.receipt-grand{font-size:20px;border-top:2px solid #111;padding-top:10px}</style></head><body>${printReceipt.innerHTML}</body></html>`;
+}
+
+function pdfText(value) {
+  return String(value ?? "")
+    .replace(/₹/g, "Rs. ")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function pdfMoney(value) {
+  return `Rs. ${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
+}
+
+function wrapPdfText(text, maxLength = 42) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function buildBillPdf(bill) {
+  const commands = [];
+  let y = 792;
+  const left = 44;
+  const right = 552;
+
+  function text(x, size, value, font = "F1") {
+    commands.push(`BT /${font} ${size} Tf ${x} ${y} Td (${pdfText(value)}) Tj ET`);
+    y -= size + 7;
+  }
+
+  function rule() {
+    y -= 4;
+    commands.push(`0.6 w ${left} ${y} m ${right} ${y} l S`);
+    y -= 14;
+  }
+
+  text(150, 18, "Hotel Guru Bar & Restaurant", "F2");
+  text(246, 10, "Zari Bk, Latur");
+  rule();
+  text(left, 11, `Bill No: ${bill.billNo}`, "F2");
+  text(left, 11, `Date: ${bill.dateText || bill.date || "-"}`);
+  text(left, 11, `Table: ${bill.table || "-"}`);
+  text(left, 11, `Customer: ${bill.customer || "-"}`);
+  rule();
+  text(left, 12, "Items", "F2");
+
+  bill.items.forEach((item, index) => {
+    const nameLines = wrapPdfText(`${index + 1}. ${item.name}`, 44);
+    text(left, 10, nameLines[0], "F2");
+    nameLines.slice(1).forEach((line) => text(left + 14, 10, line, "F2"));
+    y += 17;
+    text(390, 10, `${item.quantity} x ${pdfMoney(item.price)}`);
+    y += 17;
+    text(486, 10, pdfMoney(item.price * item.quantity), "F2");
+    y -= 4;
+  });
+
+  rule();
+  text(360, 11, `Subtotal: ${pdfMoney(bill.subtotal)}`);
+  if (bill.gstEnabled) text(360, 11, `GST ${bill.gstRate}%: ${pdfMoney(bill.gstAmount)}`);
+  y -= 2;
+  text(360, 15, `Total: ${pdfMoney(bill.grandTotal)}`, "F2");
+  rule();
+  text(205, 10, "Thank you. Visit again.");
+
+  const content = commands.join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 function prepareReceipt() {
@@ -443,11 +629,11 @@ async function chooseBillsFolder() {
 }
 
 async function saveWithFolderPicker(bill) {
-  const htmlFile = await billsDirectoryHandle.getFileHandle(`${bill.billNo}.html`, { create: true });
+  const pdfFile = await billsDirectoryHandle.getFileHandle(`${bill.billNo}.pdf`, { create: true });
   const jsonFile = await billsDirectoryHandle.getFileHandle(`${bill.billNo}.json`, { create: true });
-  const htmlWritable = await htmlFile.createWritable();
-  await htmlWritable.write(fullReceiptHtml(bill));
-  await htmlWritable.close();
+  const pdfWritable = await pdfFile.createWritable();
+  await pdfWritable.write(buildBillPdf(bill));
+  await pdfWritable.close();
   const jsonWritable = await jsonFile.createWritable();
   await jsonWritable.write(JSON.stringify(bill, null, 2));
   await jsonWritable.close();
@@ -470,10 +656,11 @@ async function saveBillToFolder() {
   }
 
   try {
+    const receiptPdfBase64 = await blobToBase64(buildBillPdf(bill));
     const response = await fetch("/api/save-bill", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bill, receiptHtml: printReceipt.innerHTML })
+      body: JSON.stringify({ bill, receiptPdfBase64 })
     });
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Save failed");
@@ -483,7 +670,7 @@ async function saveBillToFolder() {
   } catch {
     downloadReceipt(bill);
     recordSale(bill);
-    saveStatus.textContent = "Saved as browser download. Start server.js to save inside the project bills folder.";
+    saveStatus.textContent = `Bill saved: ${bill.billNo}`;
     removeActiveOrder();
   }
   renderSalesReport();
@@ -491,8 +678,8 @@ async function saveBillToFolder() {
 
 function downloadReceipt(bill) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([fullReceiptHtml(bill)], { type: "text/html" }));
-  link.download = `${bill.billNo}.html`;
+  link.href = URL.createObjectURL(buildBillPdf(bill));
+  link.download = `${bill.billNo}.pdf`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -673,13 +860,14 @@ async function archiveOldSales() {
 function scheduleDailyRollover() {
   if (rolloverTimer) clearTimeout(rolloverTimer);
   const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setHours(24, 0, 0, 0);
+  const nextReset = new Date(now);
+  nextReset.setHours(reportResetHour, 0, 0, 0);
+  if (now >= nextReset) nextReset.setDate(nextReset.getDate() + 1);
   rolloverTimer = setTimeout(async () => {
     await archiveOldSales();
     setToday();
     scheduleDailyRollover();
-  }, nextMidnight.getTime() - now.getTime() + 1000);
+  }, nextReset.getTime() - now.getTime() + 1000);
 }
 
 function renderSalesReport() {
@@ -710,7 +898,7 @@ function renderSalesReport() {
 function renderMenuTable() {
   menuTable.innerHTML = items.length ? items.map((item) => `
     <div class="menu-table-row">
-      <span>${item.name}<small>${item.category}${item.category === "Drinks" ? ` / ${drinkSubcategory(item)}` : ""} - ${currency.format(item.price)}</small></span>
+      <span>${item.name}<small>${item.category === "Starter" ? "Snacks" : item.category}${item.category === "Drinks" ? ` / ${drinkSubcategory(item)}` : ""} - ${currency.format(item.price)}</small></span>
       <button type="button" data-edit="${item.id}">Edit</button>
       <button type="button" data-delete="${item.id}">Delete</button>
     </div>`).join("") : '<p class="empty-state">No menu items. Add your first item above.</p>';
@@ -721,6 +909,17 @@ function resetMenuForm() {
   editItemId.value = "";
   if (menuSubmitButton) menuSubmitButton.textContent = "Save Item";
   syncDrinkTypeField();
+}
+
+function suggestMenuItemPhoto() {
+  if (menuItemPhoto.value.trim()) return;
+  const suggestion = keywordImage({
+    id: slugify(menuItemName.value),
+    name: menuItemName.value,
+    category: menuItemCategory.value,
+    subcategory: menuItemSubcategory.value
+  });
+  if (suggestion) menuItemPhoto.placeholder = "Auto image will be used";
 }
 
 function uniqueMenuItemId(baseId) {
@@ -771,6 +970,7 @@ function formatDate(value) {
 
 function todayValue() {
   const now = new Date();
+  if (now.getHours() < reportResetHour) now.setDate(now.getDate() - 1);
   const offset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
@@ -823,6 +1023,10 @@ menuTabs.addEventListener("click", (event) => {
   activeFilter = tab.dataset.filter;
   foodSubmenu.hidden = activeFilter !== "Food";
   drinkSubmenu.hidden = activeFilter !== "Drinks";
+  if (activeFilter === "Snacks") {
+    activeSubfilter = "all";
+    activeDrinkSubfilter = "all";
+  }
   menuTabs.querySelectorAll("button").forEach((button) => button.classList.toggle("active", button === tab));
   renderItems();
 });
@@ -913,6 +1117,8 @@ document.addEventListener("keydown", (event) => {
 
 menuForm.addEventListener("submit", saveMenuItem);
 menuItemCategory.addEventListener("change", syncDrinkTypeField);
+menuItemName.addEventListener("input", suggestMenuItemPhoto);
+menuItemSubcategory.addEventListener("change", suggestMenuItemPhoto);
 document.querySelector("#cancelEdit").addEventListener("click", () => {
   resetMenuForm();
 });
@@ -933,7 +1139,11 @@ document.querySelector("#clearQty").addEventListener("click", () => {
   saveActiveOrder();
 });
 document.querySelector("#printBill").addEventListener("click", () => {
-  prepareReceipt();
+  const bill = prepareReceipt();
+  if (!bill.items.length) {
+    saveStatus.textContent = "Add items before printing bill.";
+    return;
+  }
   window.print();
 });
 document.querySelector("#chooseFolder").addEventListener("click", chooseBillsFolder);
