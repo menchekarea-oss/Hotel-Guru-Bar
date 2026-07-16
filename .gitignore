@@ -1,0 +1,8 @@
+node_modules/
+npm-debug.log*
+Bills/*.html
+Bills/*.json
+Bills/*.sqlite
+bills/*.html
+bills/*.json
+bills/*.sqlite
