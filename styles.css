@@ -2832,7 +2832,7 @@ body {
   border-radius: 0;
   background:
     linear-gradient(90deg, rgba(15, 13, 17, 0.76), rgba(15, 13, 17, 0.28), rgba(15, 13, 17, 0.8)),
-    url("/assets/bar-background.png") center 46% / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center 46% / cover no-repeat;
 }
 
 .hero-band img {
@@ -2964,7 +2964,7 @@ textarea:focus {
   pointer-events: none;
   background:
     linear-gradient(rgba(255, 250, 242, 0.56), rgba(255, 250, 242, 0.68)),
-    url("/assets/bar-background.png") center center / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
   opacity: 0.58;
   filter: saturate(0.88) contrast(1.02);
 }
@@ -3325,7 +3325,7 @@ textarea:focus {
 .report-panel.admin-modal {
   background:
     linear-gradient(rgba(255, 250, 242, 0.92), rgba(255, 250, 242, 0.96)),
-    url("/assets/bar-background.png") center center / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
 }
 
 .report-panel .modal-heading {
@@ -3386,7 +3386,7 @@ textarea:focus {
   min-height: 96px;
   background:
     linear-gradient(90deg, rgba(33, 26, 21, 0.94), rgba(104, 65, 33, 0.86)),
-    url("/assets/bar-background.png") center center / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
 }
 
 .report-panel .report-date-card span,
@@ -3533,7 +3533,7 @@ textarea:focus {
 .manager-panel.admin-modal {
   background:
     linear-gradient(rgba(255, 250, 242, 0.94), rgba(255, 250, 242, 0.97)),
-    url("/assets/bar-background.png") center center / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
 }
 
 .manager-panel .modal-heading {
@@ -3640,7 +3640,7 @@ body::before {
   background:
     linear-gradient(90deg, rgba(15, 13, 17, 0.78), rgba(15, 13, 17, 0.42) 44%, rgba(15, 13, 17, 0.82)),
     linear-gradient(180deg, rgba(15, 13, 17, 0.32), rgba(15, 13, 17, 0.68)),
-    url("/assets/bar-background.png") center center / cover no-repeat;
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
   opacity: 0.62;
   filter: saturate(0.9) contrast(1.04);
 }
@@ -3700,7 +3700,7 @@ body::after {
     background:
       linear-gradient(180deg, rgba(15, 13, 17, 0.86), rgba(15, 13, 17, 0.58) 45%, rgba(15, 13, 17, 0.92)),
       linear-gradient(90deg, rgba(15, 13, 17, 0.48), rgba(15, 13, 17, 0.68)),
-      url("/assets/bar-background.png") center center / cover no-repeat;
+      url("/assets/bar-background-mobile.jpg") center center / cover no-repeat;
     opacity: 0.38;
   }
 
@@ -4802,4 +4802,29 @@ body::after {
     text-align: left !important;
     padding-left: 16px !important;
   }
+}
+
+/* Final reliable in-panel image visibility */
+.content-grid > section:first-child {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  background-color: rgba(255, 250, 242, 0.72) !important;
+}
+
+.content-grid > section:first-child::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  background:
+    linear-gradient(rgba(255, 250, 242, 0.48), rgba(255, 250, 242, 0.62)),
+    url("/assets/bar-background-mobile.jpg") center center / cover no-repeat !important;
+  opacity: 0.72 !important;
+}
+
+.content-grid > section:first-child > * {
+  position: relative !important;
+  z-index: 1 !important;
 }
