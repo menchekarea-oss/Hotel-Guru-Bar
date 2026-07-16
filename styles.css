@@ -4850,3 +4850,47 @@ body::after {
 @media print {
   .site-bg-image { display: none !important; }
 }
+
+/* Bill action buttons near receipt */
+.bill-bottom-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  margin-top: 18px !important;
+  padding-top: 16px !important;
+  border-top: 1px solid rgba(240, 195, 125, 0.18) !important;
+}
+
+.bill-bottom-actions .print-btn {
+  width: 100% !important;
+  min-height: 46px !important;
+  justify-content: center !important;
+}
+
+.bill-bottom-actions #saveBillBottom {
+  background: linear-gradient(180deg, #e0a04c, #c47b27) !important;
+  border-color: #d6923d !important;
+  color: #0f1016 !important;
+}
+
+@media (max-width: 767px) {
+  .topbar .top-actions {
+    display: none !important;
+  }
+
+  .bill-bottom-actions {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 10 !important;
+    margin: 18px -14px -14px !important;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom)) !important;
+    background: rgba(23, 21, 26, 0.96) !important;
+    border-top: 1px solid rgba(240, 195, 125, 0.26) !important;
+    box-shadow: 0 -12px 26px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  .bill-bottom-actions .print-btn {
+    min-height: 52px !important;
+    font-size: 14px !important;
+  }
+}
