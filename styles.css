@@ -4611,15 +4611,22 @@ body::after {
     flex-direction: column !important;
     align-items: stretch !important;
     min-height: auto !important;
-    padding: 18px 14px 14px !important;
+    padding: 18px 14px 16px !important;
     overflow: visible !important;
     background: #17151a !important;
   }
 
   .topbar > div:first-child {
     display: block !important;
+    order: 1 !important;
     width: 100% !important;
     min-width: 0 !important;
+    padding: 0 0 12px !important;
+    border-bottom: 1px solid rgba(240, 195, 125, 0.18) !important;
+  }
+
+  .topbar .top-actions {
+    order: 2 !important;
   }
 
   .kicker {
@@ -4658,5 +4665,141 @@ body::after {
   .brand-rest {
     display: inline !important;
     color: #ffffff !important;
+  }
+
+  .top-actions {
+    margin-top: 12px !important;
+  }
+}
+
+/* Mobile visible hotel title strip */
+.mobile-brand-bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-jump-nav {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .mobile-brand-bar {
+    display: block !important;
+    grid-column: 1 / -1 !important;
+    padding: 12px 14px !important;
+    background: #17151a !important;
+    text-align: left !important;
+    border-bottom: 1px solid rgba(240, 195, 125, 0.18) !important;
+  }
+
+  .mobile-brand-bar > span {
+    display: block !important;
+    color: #f0c37d !important;
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0.16em !important;
+    text-transform: uppercase !important;
+  }
+
+  .mobile-brand-bar strong {
+    display: block !important;
+    margin-top: 4px !important;
+    color: #ffffff !important;
+    font-size: clamp(24px, 7.5vw, 32px) !important;
+    font-weight: 950 !important;
+    line-height: 1.08 !important;
+    white-space: normal !important;
+  }
+
+  .mobile-brand-bar strong span {
+    display: inline !important;
+    color: #f0c37d !important;
+    font-size: 1.22em !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+  }
+}
+
+/* Professional GST controls */
+.gst-apply-field .toggle-row {
+  min-height: 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 6px 8px 6px 14px !important;
+  border: 1px solid rgba(31, 32, 40, 0.14) !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #1f2028 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35) !important;
+}
+
+.gst-apply-field .toggle-row input {
+  appearance: none !important;
+  width: 46px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #c8c1b7 !important;
+  position: relative !important;
+  cursor: pointer !important;
+  transition: background 0.16s ease !important;
+}
+
+.gst-apply-field .toggle-row input::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24) !important;
+  transition: transform 0.16s ease !important;
+}
+
+.gst-apply-field .toggle-row input:checked {
+  background: #c27b2b !important;
+}
+
+.gst-apply-field .toggle-row input:checked::after {
+  transform: translateX(22px) !important;
+}
+
+.gst-apply-field .toggle-row > span {
+  color: #1f2028 !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+}
+
+.gst-rate-field input {
+  text-align: center !important;
+  font-weight: 950 !important;
+}
+
+@media (max-width: 767px) {
+  .gst-apply-field,
+  .gst-rate-field {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  .gst-apply-field .toggle-row {
+    min-height: 48px !important;
+    padding: 8px 10px 8px 14px !important;
+  }
+
+  .gst-rate-field input {
+    min-height: 48px !important;
+    text-align: left !important;
+    padding-left: 16px !important;
   }
 }
