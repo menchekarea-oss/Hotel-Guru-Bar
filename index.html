@@ -24,6 +24,10 @@
         </header>
 
         <nav class="mobile-jump-nav" aria-label="Mobile shortcuts">
+          <div class="mobile-brand-bar">
+            <span>Zari Bk, Latur</span>
+            <strong><span>G</span>uru Bar & Restaurant</strong>
+          </div>
           <a href="#tableSection">Tables</a>
           <a href="#itemsTitle">Menu</a>
           <a href="#summaryTitle">Bill</a>
@@ -65,14 +69,14 @@
             Date
             <input id="billDate" type="date" />
           </label>
-          <label>
+          <label class="gst-apply-field">
             GST
             <span class="toggle-row">
               <input id="gstEnabled" type="checkbox" checked />
               <span>Apply</span>
             </span>
           </label>
-          <label>
+          <label class="gst-rate-field">
             GST %
             <input id="gstRate" type="number" min="0" step="0.5" value="5" />
           </label>
