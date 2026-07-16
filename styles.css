@@ -4878,6 +4878,14 @@ body::after {
     display: none !important;
   }
 
+  .mobile-brand-bar {
+    display: none !important;
+  }
+
+  .mobile-jump-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
   .bill-bottom-actions {
     position: sticky !important;
     bottom: 0 !important;
