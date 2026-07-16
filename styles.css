@@ -4603,3 +4603,60 @@ body::after {
     display: none !important;
   }
 }
+
+/* Final mobile header visibility fix */
+@media (max-width: 767px) {
+  .topbar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    min-height: auto !important;
+    padding: 18px 14px 14px !important;
+    overflow: visible !important;
+    background: #17151a !important;
+  }
+
+  .topbar > div:first-child {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .kicker {
+    display: block !important;
+    margin: 0 0 8px !important;
+    color: #f0c37d !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0.16em !important;
+    text-transform: uppercase !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .brand-title {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    color: #ffffff !important;
+    font-size: clamp(27px, 8vw, 36px) !important;
+    line-height: 1.08 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .brand-initial {
+    display: inline !important;
+    color: #f0c37d !important;
+    font-size: 1.28em !important;
+  }
+
+  .brand-rest {
+    display: inline !important;
+    color: #ffffff !important;
+  }
+}
