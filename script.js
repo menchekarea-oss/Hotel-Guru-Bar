@@ -404,10 +404,7 @@ function setActiveOrder(id) {
   billNo.value = order.billNo || reserveBillNumber();
   tableNo.value = order.table || "";
   customerName.value = order.customer || "";
-  const today = todayValue();
-  const orderDate = order.date || today;
-  const orderYear = orderDate ? Number(orderDate.slice(0, 4)) : 0;
-  billDate.value = !orderDate || orderYear < Number(today.slice(0, 4)) || orderDate > today ? today : orderDate;
+  billDate.value = todayValue();
   gstEnabled.checked = order.gstEnabled !== false;
   gstRate.value = order.gstRate || "5";
   restoreQuantities(order.quantities);
@@ -987,7 +984,7 @@ function buildDailyReport(date) {
 }
 
 function selectedReportDate() {
-  return billDate.value || todayValue();
+  return todayValue();
 }
 
 function dailyReportHtml(report) {
@@ -1209,13 +1206,7 @@ function todayValue() {
 }
 
 function setToday() {
-  const today = todayValue();
-  const selected = billDate.value;
-  const selectedYear = selected ? Number(selected.slice(0, 4)) : 0;
-  const currentYear = Number(today.slice(0, 4));
-  if (!selected || selectedYear < currentYear || selected > today) {
-    billDate.value = today;
-  }
+  billDate.value = todayValue();
 }
 
 function syncDrinkTypeField() {
