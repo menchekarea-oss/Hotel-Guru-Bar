@@ -125,6 +125,7 @@ const menuKey = "hotelGuruMenu";
 const supabaseProjectUrl = "https://qujeznrhidgyripoqirf.supabase.co";
 const supabasePublishableKey = "sb_publishable_t9Vz4mu8f7I8N9xqPZaEUQ_ifJ02wpM";
 const supabaseMenuEndpoint = `${supabaseProjectUrl}/rest/v1/menu_items`;
+const supabaseSalesEndpoint = `${supabaseProjectUrl}/rest/v1/sales`;
 const salesKey = "hotelGuruSales";
 const billCounterKey = "hotelGuruBillCounter";
 const tableOrdersKey = "hotelGuruTableOrders";
@@ -145,6 +146,7 @@ let showAllTopItems = false;
 let isRestoringOrder = false;
 let rolloverTimer = null;
 let menuSyncInProgress = false;
+let salesSyncInProgress = false;
 
 const itemsGrid = document.querySelector("#itemsGrid");
 const billLines = document.querySelector("#billLines");
@@ -402,7 +404,10 @@ function setActiveOrder(id) {
   billNo.value = order.billNo || reserveBillNumber();
   tableNo.value = order.table || "";
   customerName.value = order.customer || "";
-  billDate.value = order.date || todayValue();
+  const today = todayValue();
+  const orderDate = order.date || today;
+  const orderYear = orderDate ? Number(orderDate.slice(0, 4)) : 0;
+  billDate.value = !orderDate || orderYear < Number(today.slice(0, 4)) || orderDate > today ? today : orderDate;
   gstEnabled.checked = order.gstEnabled !== false;
   gstRate.value = order.gstRate || "5";
   restoreQuantities(order.quantities);
@@ -813,10 +818,15 @@ function downloadReceipt(bill) {
 }
 
 function recordSale(bill) {
-  const sales = JSON.parse(localStorage.getItem(salesKey) || "[]");
-  sales.push(bill);
-  localStorage.setItem(salesKey, JSON.stringify(sales));
-  markReportUnsaved(bill.date);
+  const sale = normalizeSale(bill);
+  mergeSales([sale]);
+  markReportUnsaved(sale.date);
+  upsertSupabaseSale(sale).then(() => {
+    syncSalesFromSupabase();
+  }).catch((error) => {
+    saveStatus.textContent = "Bill saved locally. Supabase sales sync failed.";
+    console.error("Supabase sale save failed", error);
+  });
 }
 
 function loadSales() {
@@ -829,6 +839,97 @@ function loadSales() {
 
 function saveSales(sales) {
   localStorage.setItem(salesKey, JSON.stringify(sales));
+}
+
+function localDateValue(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function saleStorageId(bill) {
+  return bill.saleId || `${bill.billNo || "Bill"}-${bill.savedAt || Date.now()}`;
+}
+
+function normalizeSale(bill) {
+  return {
+    ...bill,
+    saleId: saleStorageId(bill),
+    date: bill.date || localDateValue(),
+    savedAt: bill.savedAt || new Date().toISOString()
+  };
+}
+
+function mergeSales(nextSales) {
+  const merged = new Map();
+  loadSales().map(normalizeSale).forEach((sale) => merged.set(sale.saleId, sale));
+  nextSales.map(normalizeSale).forEach((sale) => merged.set(sale.saleId, sale));
+  const sorted = [...merged.values()].sort((a, b) => String(a.savedAt || "").localeCompare(String(b.savedAt || "")));
+  saveSales(sorted);
+  return sorted;
+}
+
+function saleToSupabase(bill) {
+  const sale = normalizeSale(bill);
+  return {
+    id: sale.saleId,
+    bill_no: sale.billNo,
+    sale_date: sale.date,
+    grand_total: Number(sale.grandTotal) || 0,
+    bill: sale,
+    saved_at: sale.savedAt
+  };
+}
+
+function saleFromSupabase(row) {
+  return normalizeSale(row.bill || {
+    saleId: row.id,
+    billNo: row.bill_no,
+    date: row.sale_date,
+    grandTotal: row.grand_total,
+    savedAt: row.saved_at,
+    items: []
+  });
+}
+
+async function upsertSupabaseSale(bill) {
+  const response = await fetch(supabaseSalesEndpoint, {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(saleToSupabase(bill))
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+async function fetchSupabaseSales() {
+  const response = await fetch(`${supabaseSalesEndpoint}?select=*&order=saved_at.asc`, {
+    headers: supabaseHeaders()
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()).map(saleFromSupabase);
+}
+
+async function syncSalesFromSupabase({ silent = true } = {}) {
+  if (salesSyncInProgress) return;
+  salesSyncInProgress = true;
+  try {
+    const cloudSales = await fetchSupabaseSales();
+    mergeSales(cloudSales);
+    renderSalesReport();
+    if (!silent) saveStatus.textContent = "Sales report synced with Supabase.";
+  } catch (error) {
+    if (!silent) saveStatus.textContent = "Sales sync failed. Check Supabase sales table.";
+    console.error("Supabase sales sync failed", error);
+  } finally {
+    salesSyncInProgress = false;
+  }
+}
+
+function startSupabaseSalesSync() {
+  syncSalesFromSupabase();
+  window.setInterval(() => syncSalesFromSupabase(), 30000);
 }
 
 function getSavedReportDates() {
@@ -1104,14 +1205,17 @@ function formatDate(value) {
 }
 
 function todayValue() {
-  const now = new Date();
-  if (now.getHours() < reportResetHour) now.setDate(now.getDate() - 1);
-  const offset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+  return localDateValue();
 }
 
 function setToday() {
-  billDate.value = todayValue();
+  const today = todayValue();
+  const selected = billDate.value;
+  const selectedYear = selected ? Number(selected.slice(0, 4)) : 0;
+  const currentYear = Number(today.slice(0, 4));
+  if (!selected || selectedYear < currentYear || selected > today) {
+    billDate.value = today;
+  }
 }
 
 function syncDrinkTypeField() {
@@ -1345,3 +1449,4 @@ renderSalesReport();
 archiveOldSales();
 scheduleDailyRollover();
 startSupabaseMenuSync();
+startSupabaseSalesSync();
