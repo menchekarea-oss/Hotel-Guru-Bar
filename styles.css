@@ -4902,3 +4902,109 @@ body::after {
     font-size: 14px !important;
   }
 }
+
+/* Final desktop/tablet width guard */
+html,
+body {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+.app-shell,
+.bill-workspace,
+.workspace-main,
+.workspace-content,
+.content-grid,
+.content-grid > section,
+.bill-panel,
+.items-grid,
+.item-card,
+.customer-panel,
+.tables-panel {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.items-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+}
+
+.menu-tabs,
+.submenu-tabs {
+  flex-wrap: wrap !important;
+  overflow-x: hidden !important;
+}
+
+.menu-tabs button,
+.submenu-tabs button {
+  min-width: 0 !important;
+}
+
+@media (max-width: 1280px) and (min-width: 981px) {
+  .app-shell {
+    padding-inline: 10px !important;
+  }
+
+  .workspace-main {
+    grid-template-columns: 168px minmax(0, 1fr) !important;
+  }
+
+  .side-rail {
+    padding-inline: 12px !important;
+  }
+
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 330px) !important;
+    gap: 18px !important;
+  }
+
+  .content-grid > section:first-child,
+  .bill-panel {
+    padding: 20px !important;
+  }
+
+  .items-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+
+  .item-card {
+    grid-template-columns: 86px minmax(0, 1fr) !important;
+    gap: 14px !important;
+    padding: 16px !important;
+  }
+
+  .item-card img {
+    width: 86px !important;
+    height: 86px !important;
+  }
+
+  .qty-row {
+    grid-template-columns: 40px minmax(48px, 1fr) 40px !important;
+  }
+}
+
+@media (max-width: 1080px) and (min-width: 768px) {
+  .workspace-main {
+    grid-template-columns: 142px minmax(0, 1fr) !important;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bill-panel {
+    width: 100% !important;
+  }
+
+  .items-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 768px) {
+  .items-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
