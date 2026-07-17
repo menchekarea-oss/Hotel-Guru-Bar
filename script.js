@@ -122,6 +122,9 @@ const itemImageRules = [
 ];
 
 const menuKey = "hotelGuruMenu";
+const supabaseProjectUrl = "https://qujeznrhidgyripoqirf.supabase.co";
+const supabasePublishableKey = "sb_publishable_t9Vz4mu8f7I8N9xqPZaEUQ_ifJ02wpM";
+const supabaseMenuEndpoint = `${supabaseProjectUrl}/rest/v1/menu_items`;
 const salesKey = "hotelGuruSales";
 const billCounterKey = "hotelGuruBillCounter";
 const tableOrdersKey = "hotelGuruTableOrders";
@@ -141,6 +144,7 @@ let activeOrderId = null;
 let showAllTopItems = false;
 let isRestoringOrder = false;
 let rolloverTimer = null;
+let menuSyncInProgress = false;
 
 const itemsGrid = document.querySelector("#itemsGrid");
 const billLines = document.querySelector("#billLines");
@@ -187,6 +191,130 @@ function loadMenu() {
 
 function saveMenu() {
   localStorage.setItem(menuKey, JSON.stringify(items));
+}
+
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: supabasePublishableKey,
+    Authorization: `Bearer ${supabasePublishableKey}`,
+    ...extra
+  };
+}
+
+function normalizeMenuItem(item) {
+  const category = item.category || "Thali";
+  return {
+    ...item,
+    price: Number(item.price) || 0,
+    subcategory: category === "Drinks" ? item.subcategory || "Beer" : item.subcategory || "",
+    kind: category === "Drinks" ? "liquor" : category === "Beverages" ? "drink" : "food",
+    color: item.color || "#b84a2a",
+    photo: item.photo || itemPhotos[item.id] || keywordImage(item) || ""
+  };
+}
+
+function menuItemFromSupabase(row) {
+  return normalizeMenuItem({
+    id: row.id,
+    name: row.name,
+    price: row.price,
+    category: row.category,
+    subcategory: row.subcategory || "",
+    photo: row.photo || "",
+    color: "#b84a2a"
+  });
+}
+
+function menuItemToSupabase(item, index = 0) {
+  return {
+    id: item.id,
+    name: item.name,
+    price: Number(item.price) || 0,
+    category: item.category,
+    subcategory: item.category === "Drinks" ? item.subcategory || "Beer" : item.subcategory || null,
+    photo: item.photo || "",
+    sort_order: index
+  };
+}
+
+function applySyncedMenu(nextItems) {
+  items = nextItems.map(normalizeMenuItem);
+  const itemIds = new Set(items.map((item) => item.id));
+  [...quantities.keys()].forEach((id) => {
+    if (!itemIds.has(id)) quantities.delete(id);
+  });
+  items.forEach((item) => {
+    if (!quantities.has(item.id)) quantities.set(item.id, 0);
+  });
+  saveMenu();
+  renderItems();
+  renderBill();
+  renderMenuTable();
+}
+
+async function fetchSupabaseMenu() {
+  const response = await fetch(`${supabaseMenuEndpoint}?select=*&order=sort_order.asc,name.asc`, {
+    headers: supabaseHeaders()
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()).map(menuItemFromSupabase);
+}
+
+async function upsertSupabaseMenuItem(item) {
+  const response = await fetch(supabaseMenuEndpoint, {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(menuItemToSupabase(item, items.findIndex((menuItem) => menuItem.id === item.id)))
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+async function deleteSupabaseMenuItem(id) {
+  const response = await fetch(`${supabaseMenuEndpoint}?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: supabaseHeaders()
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+async function seedSupabaseMenuIfEmpty() {
+  const cloudItems = await fetchSupabaseMenu();
+  if (cloudItems.length) return cloudItems;
+
+  const seedItems = items.map(normalizeMenuItem);
+  const response = await fetch(supabaseMenuEndpoint, {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(seedItems.map(menuItemToSupabase))
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return seedItems;
+}
+
+async function syncMenuFromSupabase({ silent = true } = {}) {
+  if (menuSyncInProgress) return;
+  menuSyncInProgress = true;
+  try {
+    const cloudItems = await seedSupabaseMenuIfEmpty();
+    if (cloudItems.length) applySyncedMenu(cloudItems);
+    if (!silent) saveStatus.textContent = "Menu synced with Supabase.";
+  } catch (error) {
+    if (!silent) saveStatus.textContent = "Supabase menu sync failed. Check table setup.";
+    console.error("Supabase menu sync failed", error);
+  } finally {
+    menuSyncInProgress = false;
+  }
+}
+
+function startSupabaseMenuSync() {
+  syncMenuFromSupabase();
+  window.setInterval(() => syncMenuFromSupabase(), 30000);
 }
 
 function loadTableOrders() {
@@ -932,7 +1060,7 @@ function uniqueMenuItemId(baseId) {
   return nextId;
 }
 
-function saveMenuItem(event) {
+async function saveMenuItem(event) {
   event.preventDefault();
   const name = menuItemName.value.trim();
   const price = Number(menuItemPrice.value);
@@ -954,6 +1082,13 @@ function saveMenuItem(event) {
   items = items.filter((menuItem) => menuItem.id !== id).concat(item);
   quantities.set(id, quantities.get(id) || 0);
   saveMenu();
+  try {
+    await upsertSupabaseMenuItem(item);
+    saveStatus.textContent = "Menu item synced to Supabase.";
+  } catch (error) {
+    saveStatus.textContent = "Saved on this device. Supabase sync failed.";
+    console.error("Supabase menu save failed", error);
+  }
   resetMenuForm();
   renderItems();
   renderMenuTable();
@@ -1069,6 +1204,10 @@ menuTable.addEventListener("click", (event) => {
     items = items.filter((menuItem) => menuItem.id !== deleteId);
     quantities.delete(deleteId);
     saveMenu();
+    deleteSupabaseMenuItem(deleteId).catch((error) => {
+      saveStatus.textContent = "Deleted on this device. Supabase sync failed.";
+      console.error("Supabase menu delete failed", error);
+    });
     renderItems();
     renderBill();
     renderMenuTable();
@@ -1127,6 +1266,22 @@ document.querySelector("#resetMenu").addEventListener("click", () => {
   quantities.clear();
   items.forEach((item) => quantities.set(item.id, 0));
   localStorage.removeItem(menuKey);
+  fetch(`${supabaseMenuEndpoint}?id=neq.__empty__`, {
+    method: "DELETE",
+    headers: supabaseHeaders()
+  }).then(() => fetch(supabaseMenuEndpoint, {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(items.map((item, index) => menuItemToSupabase(normalizeMenuItem(item), index)))
+  })).then(() => {
+    saveStatus.textContent = "Default menu synced to Supabase.";
+  }).catch((error) => {
+    saveStatus.textContent = "Default menu reset locally. Supabase sync failed.";
+    console.error("Supabase menu reset failed", error);
+  });
   resetMenuForm();
   renderItems();
   renderBill();
@@ -1138,16 +1293,33 @@ document.querySelector("#clearQty").addEventListener("click", () => {
   renderBill();
   saveActiveOrder();
 });
-document.querySelector("#printBill").addEventListener("click", () => {
+function printCurrentBill() {
   const bill = prepareReceipt();
   if (!bill.items.length) {
     saveStatus.textContent = "Add items before printing bill.";
     return;
   }
   window.print();
+}
+
+document.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("#printBill, #printBillBottom, #saveBill, #saveBillBottom, #chooseFolder");
+  if (!actionButton) return;
+
+  event.preventDefault();
+
+  if (actionButton.id === "printBill" || actionButton.id === "printBillBottom") {
+    printCurrentBill();
+    return;
+  }
+
+  if (actionButton.id === "saveBill" || actionButton.id === "saveBillBottom") {
+    saveBillToFolder();
+    return;
+  }
+
+  chooseBillsFolder();
 });
-document.querySelector("#chooseFolder").addEventListener("click", chooseBillsFolder);
-document.querySelector("#saveBill").addEventListener("click", saveBillToFolder);
 salesReport.addEventListener("click", (event) => {
   if (!event.target.matches("[data-toggle-top-items]")) return;
   showAllTopItems = !showAllTopItems;
@@ -1172,3 +1344,4 @@ renderBill();
 renderSalesReport();
 archiveOldSales();
 scheduleDailyRollover();
+startSupabaseMenuSync();
