@@ -5011,6 +5011,10 @@ body {
 
 /* Final mobile submenu scrolling */
 @media (max-width: 767px) {
+  .submenu-tabs[hidden] {
+    display: none !important;
+  }
+
   .menu-tabs,
   .submenu-tabs {
     display: flex !important;
