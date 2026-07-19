@@ -140,6 +140,7 @@ let activeFilter = "all";
 let activeSubfilter = "all";
 let activeDrinkSubfilter = "all";
 let searchQuery = "";
+let managerSearchQuery = "";
 let billsDirectoryHandle = null;
 let activeOrderId = null;
 let showAllTopItems = false;
@@ -175,6 +176,7 @@ const tableTabs = document.querySelector("#tableTabs");
 const newTableName = document.querySelector("#newTableName");
 const menuForm = document.querySelector("#menuForm");
 const menuTable = document.querySelector("#menuTable");
+const menuManagerSearch = document.querySelector("#menuManagerSearch");
 const editItemId = document.querySelector("#editItemId");
 const menuItemName = document.querySelector("#menuItemName");
 const menuItemPrice = document.querySelector("#menuItemPrice");
@@ -1151,12 +1153,16 @@ function renderSalesReport() {
 }
 
 function renderMenuTable() {
-  menuTable.innerHTML = items.length ? items.map((item) => `
+  const query = managerSearchQuery.trim().toLowerCase();
+  const visibleItems = query
+    ? items.filter((item) => `${item.name} ${item.category} ${drinkSubcategory(item)} ${item.price}`.toLowerCase().includes(query))
+    : items;
+  menuTable.innerHTML = visibleItems.length ? visibleItems.map((item) => `
     <div class="menu-table-row">
       <span>${item.name}<small>${item.category === "Starter" ? "Snacks" : item.category}${item.category === "Drinks" ? ` / ${drinkSubcategory(item)}` : ""} - ${currency.format(item.price)}</small></span>
       <button type="button" data-edit="${item.id}">Edit</button>
       <button type="button" data-delete="${item.id}">Delete</button>
-    </div>`).join("") : '<p class="empty-state">No menu items. Add your first item above.</p>';
+    </div>`).join("") : `<p class="empty-state">${items.length ? "No matching menu items." : "No menu items. Add your first item above."}</p>`;
 }
 
 function resetMenuForm() {
@@ -1382,6 +1388,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 menuForm.addEventListener("submit", saveMenuItem);
+menuManagerSearch.addEventListener("input", () => {
+  managerSearchQuery = menuManagerSearch.value;
+  renderMenuTable();
+});
 menuItemCategory.addEventListener("change", syncDrinkTypeField);
 menuItemName.addEventListener("input", suggestMenuItemPhoto);
 menuItemSubcategory.addEventListener("change", suggestMenuItemPhoto);
