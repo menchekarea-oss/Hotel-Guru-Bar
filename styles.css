@@ -5008,3 +5008,25 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+/* Final mobile submenu scrolling */
+@media (max-width: 767px) {
+  .menu-tabs,
+  .submenu-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    padding-bottom: 6px !important;
+  }
+
+  .menu-tabs button,
+  .submenu-tabs button {
+    flex: 0 0 auto !important;
+    min-width: 88px !important;
+    white-space: nowrap !important;
+  }
+}
