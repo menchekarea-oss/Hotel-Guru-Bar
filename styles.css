@@ -5034,3 +5034,29 @@ body {
     white-space: nowrap !important;
   }
 }
+
+/* Edit menu search */
+.manager-search {
+  display: grid !important;
+  gap: 8px !important;
+  margin: 16px 0 !important;
+  color: #f0c37d !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.manager-search input {
+  width: 100% !important;
+  min-height: 46px !important;
+  border: 1px solid rgba(240, 195, 125, 0.24) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 250, 242, 0.96) !important;
+  color: #1f2028 !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  padding: 0 14px !important;
+  text-transform: none !important;
+}
