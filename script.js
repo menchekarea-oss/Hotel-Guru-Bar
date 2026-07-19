@@ -203,12 +203,45 @@ function supabaseHeaders(extra = {}) {
   };
 }
 
+function inferDrinkSubcategory(item) {
+  const text = `${item.name || ""} ${item.id || ""} ${item.subcategory || ""}`.toLowerCase();
+  if (text.includes("old monk") || text.includes("oldmonk") || text.includes("rum")) return "Rum";
+  if (text.includes("magic moments") || text.includes("vodka")) return "Vodka";
+  if (text.includes("wine")) return "Wine";
+  if (
+    text.includes("whisky") ||
+    text.includes("whiskey") ||
+    text.includes("mcdowell") ||
+    text.includes("royal stag") ||
+    text.includes("royalstag") ||
+    text.includes("blenders") ||
+    text.includes("signature") ||
+    text.includes("imperial blue") ||
+    text.includes("officer") ||
+    text.includes("black dog") ||
+    text.includes("teachers") ||
+    text.includes("100 pipers") ||
+    text.includes("antiquity")
+  ) return "Whisky";
+  if (
+    text.includes("beer") ||
+    text.includes("kingfisher") ||
+    text.includes("tuborg") ||
+    text.includes("budweiser") ||
+    text.includes("carlsberg") ||
+    text.includes("corona") ||
+    text.includes("bira")
+  ) return "Beer";
+  return "";
+}
+
 function normalizeMenuItem(item) {
   const category = item.category || "Thali";
+  const inferredSubcategory = category === "Drinks" ? inferDrinkSubcategory(item) : "";
   return {
     ...item,
     price: Number(item.price) || 0,
-    subcategory: category === "Drinks" ? item.subcategory || "Beer" : item.subcategory || "",
+    subcategory: category === "Drinks" ? inferredSubcategory || item.subcategory || "Beer" : item.subcategory || "",
     kind: category === "Drinks" ? "liquor" : category === "Beverages" ? "drink" : "food",
     color: item.color || "#b84a2a",
     photo: item.photo || itemPhotos[item.id] || keywordImage(item) || ""
@@ -490,13 +523,9 @@ function itemImage(item) {
 }
 
 function drinkSubcategory(item) {
+  const inferred = inferDrinkSubcategory(item);
+  if (inferred) return inferred;
   if (item.subcategory) return item.subcategory;
-  const text = `${item.name} ${item.id}`.toLowerCase();
-  if (text.includes("beer") || text.includes("kingfisher") || text.includes("tuborg")) return "Beer";
-  if (text.includes("whisky") || text.includes("whiskey") || text.includes("royal") || text.includes("blenders") || text.includes("signature") || text.includes("mcdowell")) return "Whisky";
-  if (text.includes("wine")) return "Wine";
-  if (text.includes("vodka") || text.includes("magic moments")) return "Vodka";
-  if (text.includes("rum") || text.includes("old monk") || text.includes("oldmonk")) return "Rum";
   return "Other";
 }
 
@@ -1166,7 +1195,10 @@ async function saveMenuItem(event) {
   const existingId = editItemId.value;
   const id = existingId || uniqueMenuItemId(slugify(name));
   const category = menuItemCategory.value;
-  const subcategory = category === "Drinks" ? menuItemSubcategory.value || "Beer" : "";
+  const selectedSubcategory = category === "Drinks" ? menuItemSubcategory.value || "" : "";
+  const subcategory = category === "Drinks"
+    ? inferDrinkSubcategory({ id, name, subcategory: selectedSubcategory }) || selectedSubcategory || "Beer"
+    : "";
   const item = {
     id,
     name,
