@@ -4495,17 +4495,18 @@ body::after {
   }
 }
 
-/* Final reliable print output */
+/* Final reliable print output — 58mm thermal roll */
 @media print {
   @page {
-    margin: 12mm;
+    size: 58mm auto;
+    margin: 0;
   }
 
   html,
   body {
-    width: auto !important;
+    width: 58mm !important;
     min-height: auto !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
@@ -4524,10 +4525,10 @@ body::after {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 100% !important;
+    width: 58mm !important;
     min-height: auto !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     color: #111111 !important;
     background: #ffffff !important;
   }
@@ -4541,11 +4542,20 @@ body::after {
 
   .receipt {
     display: block !important;
-    max-width: 420px !important;
+    width: 54mm !important;
+    max-width: 54mm !important;
     margin: 0 auto !important;
+    padding: 2mm 0 !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
     background: #ffffff !important;
+  }
+
+  .receipt h2 {
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    margin: 0 0 4px !important;
   }
 
   .receipt h2,
@@ -4554,24 +4564,50 @@ body::after {
     text-align: center !important;
   }
 
+  .receipt-meta {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    font-size: 10px !important;
+    padding: 6px 0 !important;
+    margin: 8px 0 !important;
+  }
+
+  .receipt-meta span {
+    display: block !important;
+  }
+
   .receipt table {
     width: 100% !important;
     border-collapse: collapse !important;
   }
 
   .receipt td {
-    padding: 7px 0 !important;
+    padding: 4px 0 !important;
     border-bottom: 1px dashed #999999 !important;
+    font-size: 11px !important;
+    word-break: break-word !important;
+  }
+
+  .receipt td small {
+    font-size: 9px !important;
   }
 
   .receipt td:last-child {
     text-align: right !important;
     font-weight: 800 !important;
+    white-space: nowrap !important;
   }
 
   .receipt-totals p {
     display: flex !important;
     justify-content: space-between !important;
+    font-size: 11px !important;
+    margin: 3px 0 !important;
+  }
+
+  .receipt-grand {
+    font-size: 14px !important;
   }
 }
 
