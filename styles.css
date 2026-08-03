@@ -4542,10 +4542,10 @@ body::after {
 
   .receipt {
     display: block !important;
-    width: 54mm !important;
-    max-width: 54mm !important;
+    width: 52mm !important;
+    max-width: 52mm !important;
     margin: 0 auto !important;
-    padding: 2mm 0 !important;
+    padding: 2mm 1.5mm !important;
     font-family: Arial, Helvetica, sans-serif !important;
     font-size: 11px !important;
     line-height: 1.35 !important;
