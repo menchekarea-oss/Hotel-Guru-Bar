@@ -4550,6 +4550,7 @@ body::after {
     font-size: 11px !important;
     line-height: 1.35 !important;
     background: #ffffff !important;
+    overflow-x: hidden !important;
   }
 
   .receipt h2 {
@@ -4579,6 +4580,7 @@ body::after {
 
   .receipt table {
     width: 100% !important;
+    table-layout: fixed !important;
     border-collapse: collapse !important;
   }
 
@@ -4586,7 +4588,13 @@ body::after {
     padding: 4px 0 !important;
     border-bottom: 1px dashed #999999 !important;
     font-size: 11px !important;
+    overflow-wrap: break-word !important;
     word-break: break-word !important;
+  }
+
+  .receipt td:first-child {
+    width: 68% !important;
+    padding-right: 2px !important;
   }
 
   .receipt td small {
@@ -4594,9 +4602,11 @@ body::after {
   }
 
   .receipt td:last-child {
+    width: 32% !important;
     text-align: right !important;
     font-weight: 800 !important;
     white-space: nowrap !important;
+    overflow: hidden !important;
   }
 
   .receipt-totals p {
