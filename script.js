@@ -875,7 +875,7 @@ function localDateValue(date = new Date()) {
 }
 
 function saleStorageId(bill) {
-  return bill.saleId || `${bill.billNo || "Bill"}-${bill.savedAt || Date.now()}`;
+  return bill.saleId || `${bill.billNo || "Bill"}`;
 }
 
 function normalizeSale(bill) {
@@ -1436,6 +1436,8 @@ function printCurrentBill() {
     saveStatus.textContent = "Add items before printing bill.";
     return;
   }
+  recordSale(bill);
+  renderSalesReport();
   window.print();
 }
 
