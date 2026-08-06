@@ -1,0 +1,228 @@
+/* Guru POS owner report controls — loaded after the main stylesheet. */
+.owner-pin-fields {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.owner-pin-fields label {
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.owner-pin-card [hidden],
+.report-filter-bar [hidden],
+#ownerCurrentPinField[hidden],
+#ownerPinConfirmField[hidden],
+#reportDateField[hidden],
+#reportMonthField[hidden] {
+  display: none !important;
+}
+
+.report-panel.admin-modal {
+  background: #f4eee6 !important;
+}
+
+.report-panel .modal-heading {
+  min-height: 78px !important;
+  margin: 0 !important;
+  padding: 16px 22px !important;
+  background: linear-gradient(90deg, #17151a, #261b17) !important;
+}
+
+.report-panel .modal-heading h2 {
+  color: #fff8ed !important;
+}
+
+.report-heading-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+}
+
+.report-heading-actions button {
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  border: 1px solid rgba(226, 173, 99, 0.36) !important;
+  border-radius: 7px !important;
+  background: #211f24 !important;
+  color: #fff8ed !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+}
+
+.report-heading-actions #changeOwnerPin {
+  color: #f0c37d !important;
+}
+
+.report-filter-bar {
+  width: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(155px, 0.8fr) minmax(190px, 1fr) minmax(330px, 1.7fr) auto !important;
+  gap: 12px !important;
+  align-items: end !important;
+  margin: 0 !important;
+  padding: 16px 20px !important;
+  border-bottom: 1px solid rgba(31, 32, 40, 0.14) !important;
+  background: #eee5d9 !important;
+}
+
+.report-filter-bar label,
+.report-filter-bar .report-date-filter {
+  display: grid;
+  min-width: 0 !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  color: #665c52 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+}
+
+.report-filter-bar input,
+.report-filter-bar select {
+  width: 100% !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border: 1px solid rgba(31, 32, 40, 0.18) !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #1f2028 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.report-calendar-nav {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(92px, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.report-filter-bar > button,
+.report-calendar-nav button {
+  width: auto !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 13px !important;
+  border: 1px solid rgba(31, 32, 40, 0.2) !important;
+  border-radius: 7px !important;
+  background: #28252b !important;
+  color: #fff8ed !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+}
+
+.report-filter-bar #reportCurrent {
+  background: #ffffff !important;
+  color: #3a2a1d !important;
+}
+
+.report-filter-bar > #reportSyncNow {
+  border-color: #c27b2b !important;
+  background: #c27b2b !important;
+  color: #17100b !important;
+}
+
+.report-panel .report-grid {
+  margin: 0 !important;
+  padding: 20px !important;
+}
+
+.report-period-list,
+.report-bill-history {
+  display: grid !important;
+  gap: 0 !important;
+  max-height: 320px !important;
+  margin-top: 10px !important;
+  overflow: auto !important;
+}
+
+.report-period-row,
+.report-bill-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 11px 0 !important;
+  border-bottom: 1px solid rgba(255, 247, 234, 0.12) !important;
+}
+
+.report-period-row strong,
+.report-bill-row strong {
+  color: #fff8ed !important;
+  font-size: 14px !important;
+}
+
+.report-period-row small,
+.report-bill-row small {
+  color: rgba(255, 247, 234, 0.66) !important;
+}
+
+.report-period-row b,
+.report-bill-row b {
+  color: #f0c37d !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 1080px) {
+  .report-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .report-calendar-nav {
+    grid-column: 1 / -1 !important;
+  }
+
+  .report-filter-bar > #reportSyncNow {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .report-panel .modal-heading {
+    align-items: stretch !important;
+  }
+
+  .report-heading-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    width: 100% !important;
+  }
+
+  .report-filter-bar {
+    grid-template-columns: 1fr !important;
+    padding: 12px 14px !important;
+  }
+
+  .report-calendar-nav {
+    grid-column: auto !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .report-filter-bar > button,
+  .report-calendar-nav button {
+    width: 100% !important;
+  }
+
+  .report-panel .report-grid {
+    padding: 14px !important;
+  }
+
+  .report-period-row,
+  .report-bill-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .report-period-row small,
+  .report-bill-row small {
+    grid-column: 1 / -1 !important;
+  }
+}

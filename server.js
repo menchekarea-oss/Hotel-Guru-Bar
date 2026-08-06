@@ -16,7 +16,9 @@ const types = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
-  ".json": "application/json; charset=utf-8"
+  ".pdf": "application/pdf",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8"
 };
 
 let databaseReady = null;
@@ -205,14 +207,18 @@ async function saveBill(req, res) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const billNo = safeName(payload.bill?.billNo || payload.billNo);
     const base = `${billNo}-${stamp}`;
-    const htmlPath = path.join(billsDir, `${base}.html`);
+    const pdfPath = path.join(billsDir, `${base}.pdf`);
     const jsonPath = path.join(billsDir, `${base}.json`);
     const bill = payload.bill || payload;
-    fs.writeFileSync(htmlPath, payload.receiptHtml || "", "utf8");
+    if (payload.receiptPdfBase64) {
+      fs.writeFileSync(pdfPath, Buffer.from(payload.receiptPdfBase64, "base64"));
+    } else {
+      fs.writeFileSync(pdfPath, "");
+    }
     fs.writeFileSync(jsonPath, JSON.stringify(bill, null, 2), "utf8");
-    await insertBillIntoDatabase(bill, htmlPath, jsonPath);
+    await insertBillIntoDatabase(bill, pdfPath, jsonPath);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, htmlPath, jsonPath, dbPath }));
+    res.end(JSON.stringify({ ok: true, pdfPath, jsonPath, dbPath }));
   } catch (error) {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: error.message }));
@@ -272,8 +278,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Hotel Guru billing app running at http://127.0.0.1:${port}`);
+server.listen(port, "0.0.0.0", () => {
+  console.log(`Hotel Guru billing app running at http://0.0.0.0:${port}`);
   console.log(`Bills will be saved in ${billsDir}`);
   console.log(`SQLite database will be saved at ${dbPath}`);
 });

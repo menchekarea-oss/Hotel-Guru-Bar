@@ -131,7 +131,13 @@ const billCounterKey = "hotelGuruBillCounter";
 const tableOrdersKey = "hotelGuruTableOrders";
 const activeTableOrderKey = "hotelGuruActiveTableOrder";
 const savedReportsKey = "hotelGuruSavedReports";
+const deviceIdKey = "hotelGuruDeviceId";
+const lastCloudSyncKey = "hotelGuruLastCloudSync";
+const ownerPinKey = "hotelGuruOwnerPin";
+const ownerPinFailuresKey = "hotelGuruOwnerPinFailures";
+const ownerPinLockUntilKey = "hotelGuruOwnerPinLockUntil";
 const reportResetHour = 2;
+const cloudRequestTimeout = 10000;
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 let items = loadMenu();
@@ -148,6 +154,15 @@ let isRestoringOrder = false;
 let rolloverTimer = null;
 let menuSyncInProgress = false;
 let salesSyncInProgress = false;
+let queueSyncInProgress = false;
+let fullSyncPromise = null;
+let pendingSyncCount = 0;
+let pendingSalesCount = 0;
+let billSaveInProgress = false;
+let lastCloudSyncAt = localStorage.getItem(lastCloudSyncKey) || "";
+let deferredInstallPrompt = null;
+let ownerReportUnlocked = false;
+let ownerPinMode = "unlock";
 
 const itemsGrid = document.querySelector("#itemsGrid");
 const billLines = document.querySelector("#billLines");
@@ -184,6 +199,29 @@ const menuItemCategory = document.querySelector("#menuItemCategory");
 const menuItemSubcategory = document.querySelector("#menuItemSubcategory");
 const menuItemPhoto = document.querySelector("#menuItemPhoto");
 const menuSubmitButton = menuForm?.querySelector(".form-submit");
+const networkState = document.querySelector("#networkState");
+const networkText = document.querySelector("#networkText");
+const syncDetail = document.querySelector("#syncDetail");
+const syncNowButton = document.querySelector("#syncNow");
+const installAppButton = document.querySelector("#installApp");
+const reportSyncNowButton = document.querySelector("#reportSyncNow");
+const reportPeriodSelect = document.querySelector("#reportPeriodSelect");
+const reportDateField = document.querySelector("#reportDateField");
+const reportDateFilter = document.querySelector("#reportDateFilter");
+const reportMonthField = document.querySelector("#reportMonthField");
+const reportMonthFilter = document.querySelector("#reportMonthFilter");
+const reportPreviousButton = document.querySelector("#reportPrevious");
+const reportCurrentButton = document.querySelector("#reportCurrent");
+const reportNextButton = document.querySelector("#reportNext");
+const ownerPinModal = document.querySelector("#ownerPinModal");
+const ownerPinForm = document.querySelector("#ownerPinForm");
+const ownerPinTitle = document.querySelector("#ownerPinTitle");
+const ownerPinHelp = document.querySelector("#ownerPinHelp");
+const ownerPinFields = document.querySelector("#ownerPinFields");
+const ownerPinError = document.querySelector("#ownerPinError");
+const ownerPinSubmit = document.querySelector("#ownerPinSubmit");
+const ownerPinCancel = document.querySelector("#ownerPinCancel");
+const changeOwnerPinButton = document.querySelector("#changeOwnerPin");
 
 function loadMenu() {
   try {
@@ -203,6 +241,179 @@ function supabaseHeaders(extra = {}) {
     Authorization: `Bearer ${supabasePublishableKey}`,
     ...extra
   };
+}
+
+async function cloudFetch(url, options = {}, timeout = cloudRequestTimeout) {
+  if (!navigator.onLine) throw new Error("Device is offline");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function randomId(prefix = "id") {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") return `${prefix}-${window.crypto.randomUUID()}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getDeviceId() {
+  let id = localStorage.getItem(deviceIdKey);
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "X");
+    localStorage.setItem(deviceIdKey, id);
+  }
+  return id;
+}
+
+function formatSyncTime(value) {
+  if (!value) return "Not synced yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not synced yet";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getOwnerPinRecord() {
+  try {
+    return JSON.parse(localStorage.getItem(ownerPinKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function createOwnerPinSalt() {
+  if (window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
+async function hashOwnerPassword(password, salt) {
+  const value = `${salt}:${password}`;
+  if (window.crypto?.subtle && window.TextEncoder) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return stableTextHash(value);
+}
+
+function ownerPinLockSeconds() {
+  const lockUntil = Number(localStorage.getItem(ownerPinLockUntilKey) || 0);
+  const remaining = Math.ceil((lockUntil - Date.now()) / 1000);
+  if (remaining <= 0 && lockUntil) {
+    localStorage.removeItem(ownerPinLockUntilKey);
+    localStorage.removeItem(ownerPinFailuresKey);
+    return 0;
+  }
+  return Math.max(0, remaining);
+}
+
+function registerOwnerPinFailure() {
+  const failures = Number(localStorage.getItem(ownerPinFailuresKey) || 0) + 1;
+  if (failures >= 5) {
+    localStorage.setItem(ownerPinLockUntilKey, String(Date.now() + 30000));
+    localStorage.setItem(ownerPinFailuresKey, "0");
+    return 30;
+  }
+  localStorage.setItem(ownerPinFailuresKey, String(failures));
+  return 0;
+}
+
+function resetOwnerPinFailures() {
+  localStorage.removeItem(ownerPinFailuresKey);
+  localStorage.removeItem(ownerPinLockUntilKey);
+}
+
+function setFieldVisibility(element, visible, display = "grid") {
+  if (!element) return;
+  element.hidden = !visible;
+  element.style.setProperty("display", visible ? display : "none", "important");
+}
+
+function openOwnerPinModal(requestedMode = "unlock") {
+  if (!ownerPinModal || !ownerPinFields) return;
+  const hasPassword = Boolean(getOwnerPinRecord());
+  ownerPinMode = !hasPassword ? "setup" : requestedMode;
+  ownerPinError.textContent = "";
+
+  if (ownerPinMode === "setup") {
+    ownerPinTitle.textContent = "Set Owner Password";
+    ownerPinHelp.textContent = "Create a password for Sales Report on this device. Set it before giving the device to staff.";
+    ownerPinSubmit.textContent = "Set & Open Report";
+    ownerPinFields.innerHTML = `
+      <label>
+        New password or PIN
+        <input id="ownerNewPassword" name="newPassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" required />
+      </label>
+      <label>
+        Confirm password
+        <input id="ownerConfirmPassword" name="confirmPassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" required />
+      </label>`;
+  } else if (ownerPinMode === "change") {
+    ownerPinTitle.textContent = "Change Owner Password";
+    ownerPinHelp.textContent = "Enter the current password, then create a new one.";
+    ownerPinSubmit.textContent = "Change Password";
+    ownerPinFields.innerHTML = `
+      <label>
+        Current password
+        <input id="ownerCurrentPassword" name="currentPassword" type="password" minlength="4" maxlength="64" autocomplete="current-password" required />
+      </label>
+      <label>
+        New password or PIN
+        <input id="ownerNewPassword" name="newPassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" required />
+      </label>
+      <label>
+        Confirm password
+        <input id="ownerConfirmPassword" name="confirmPassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" required />
+      </label>`;
+  } else {
+    ownerPinTitle.textContent = "Owner Access";
+    ownerPinHelp.textContent = "Enter the owner password to open Sales Report.";
+    ownerPinSubmit.textContent = "Unlock Report";
+    ownerPinFields.innerHTML = `
+      <label>
+        Password or PIN
+        <input id="ownerUnlockPassword" name="unlockPassword" type="password" minlength="4" maxlength="64" autocomplete="current-password" required />
+      </label>`;
+    const remaining = ownerPinLockSeconds();
+    if (remaining) ownerPinError.textContent = `Too many attempts. Try again in ${remaining} seconds.`;
+  }
+
+  ownerPinForm.reset();
+  ownerPinModal.hidden = false;
+  document.body.classList.add("modal-active");
+  window.setTimeout(() => ownerPinFields.querySelector("input")?.focus(), 50);
+}
+
+function closeOwnerPinModal() {
+  if (!ownerPinModal) return;
+  ownerPinModal.hidden = true;
+  ownerPinForm.reset();
+  ownerPinError.textContent = "";
+  if (!document.querySelector(".admin-modal.modal-open")) document.body.classList.remove("modal-active");
+}
+
+async function verifyOwnerPassword(password) {
+  const record = getOwnerPinRecord();
+  if (!record?.salt || !record?.hash) return false;
+  return (await hashOwnerPassword(password, record.salt)) === record.hash;
+}
+
+async function storeOwnerPassword(password) {
+  const salt = createOwnerPinSalt();
+  const hash = await hashOwnerPassword(password, salt);
+  localStorage.setItem(ownerPinKey, JSON.stringify({ salt, hash, createdAt: new Date().toISOString() }));
+  resetOwnerPinFailures();
 }
 
 function inferDrinkSubcategory(item) {
@@ -290,7 +501,7 @@ function applySyncedMenu(nextItems) {
 }
 
 async function fetchSupabaseMenu() {
-  const response = await fetch(`${supabaseMenuEndpoint}?select=*&order=sort_order.asc,name.asc`, {
+  const response = await cloudFetch(`${supabaseMenuEndpoint}?select=*&order=sort_order.asc,name.asc`, {
     headers: supabaseHeaders()
   });
   if (!response.ok) throw new Error(await response.text());
@@ -298,11 +509,11 @@ async function fetchSupabaseMenu() {
 }
 
 async function upsertSupabaseMenuItem(item) {
-  const response = await fetch(supabaseMenuEndpoint, {
+  const response = await cloudFetch(supabaseMenuEndpoint, {
     method: "POST",
     headers: supabaseHeaders({
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     }),
     body: JSON.stringify(menuItemToSupabase(item, items.findIndex((menuItem) => menuItem.id === item.id)))
   });
@@ -310,9 +521,9 @@ async function upsertSupabaseMenuItem(item) {
 }
 
 async function deleteSupabaseMenuItem(id) {
-  const response = await fetch(`${supabaseMenuEndpoint}?id=eq.${encodeURIComponent(id)}`, {
+  const response = await cloudFetch(`${supabaseMenuEndpoint}?id=eq.${encodeURIComponent(id)}`, {
     method: "DELETE",
-    headers: supabaseHeaders()
+    headers: supabaseHeaders({ Prefer: "return=minimal" })
   });
   if (!response.ok) throw new Error(await response.text());
 }
@@ -322,11 +533,11 @@ async function seedSupabaseMenuIfEmpty() {
   if (cloudItems.length) return cloudItems;
 
   const seedItems = items.map(normalizeMenuItem);
-  const response = await fetch(supabaseMenuEndpoint, {
+  const response = await cloudFetch(supabaseMenuEndpoint, {
     method: "POST",
     headers: supabaseHeaders({
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     }),
     body: JSON.stringify(seedItems.map(menuItemToSupabase))
   });
@@ -335,7 +546,7 @@ async function seedSupabaseMenuIfEmpty() {
 }
 
 async function syncMenuFromSupabase({ silent = true } = {}) {
-  if (menuSyncInProgress) return;
+  if (!navigator.onLine || menuSyncInProgress) return;
   menuSyncInProgress = true;
   try {
     const cloudItems = await seedSupabaseMenuIfEmpty();
@@ -367,9 +578,32 @@ function saveTableOrders(orders) {
 }
 
 function reserveBillNumber() {
-  const current = Number(localStorage.getItem(billCounterKey) || "1");
+  let current = Number(localStorage.getItem(billCounterKey) || 0);
+  if (current < 1) {
+    const knownBills = [
+      ...loadSales().map((sale) => sale.billNo),
+      ...Object.values(loadTableOrders()).map((order) => order.billNo)
+    ];
+    const highest = knownBills.reduce((maximum, value) => {
+      const match = String(value || "").match(/^GBR-(\d+)$/i);
+      return match ? Math.max(maximum, Number(match[1])) : maximum;
+    }, 0);
+    current = highest + 1;
+  }
   localStorage.setItem(billCounterKey, String(current + 1));
   return `GBR-${String(current).padStart(3, "0")}`;
+}
+
+function migrateRunningBillNumbers() {
+  const orders = loadTableOrders();
+  let changed = false;
+  Object.values(orders).forEach((order) => {
+    if (/^GBR-\d{6}-[A-Z0-9]{4}-\d+$/i.test(String(order.billNo || ""))) {
+      order.billNo = reserveBillNumber();
+      changed = true;
+    }
+  });
+  if (changed) saveTableOrders(orders);
 }
 
 function quantityObject() {
@@ -439,7 +673,7 @@ function setActiveOrder(id) {
   billNo.value = order.billNo || reserveBillNumber();
   tableNo.value = order.table || "";
   customerName.value = order.customer || "";
-  billDate.value = todayValue();
+  billDate.value = order.date || todayValue();
   gstEnabled.checked = order.gstEnabled !== false;
   gstRate.value = order.gstRate || "5";
   restoreQuantities(order.quantities);
@@ -782,7 +1016,7 @@ function prepareReceipt() {
 
 async function chooseBillsFolder() {
   if (!window.showDirectoryPicker) {
-    saveStatus.textContent = "Folder picker is not available. Save Bill will use server save or download fallback.";
+    saveStatus.textContent = "Folder picker is not available on this device. Receipts will download normally; sale data still saves offline.";
     return;
   }
   billsDirectoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
@@ -801,60 +1035,73 @@ async function saveWithFolderPicker(bill) {
 }
 
 async function saveBillToFolder() {
+  if (billSaveInProgress) return;
   const bill = prepareReceipt();
   if (!bill.items.length) {
     saveStatus.textContent = "Add items before saving bill.";
     return;
   }
 
-  if (billsDirectoryHandle) {
-    await saveWithFolderPicker(bill);
-    recordSale(bill);
-    saveStatus.textContent = `Saved in selected bills folder: ${bill.billNo}`;
-    removeActiveOrder();
-    renderSalesReport();
-    return;
-  }
+  billSaveInProgress = true;
+  document.querySelectorAll("#saveBill, #saveBillBottom").forEach((button) => {
+    button.disabled = true;
+    button.textContent = "Saving...";
+  });
 
   try {
-    const receiptPdfBase64 = await blobToBase64(buildBillPdf(bill));
-    const response = await fetch("/api/save-bill", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bill, receiptPdfBase64 })
+    if (billsDirectoryHandle) {
+      await saveWithFolderPicker(bill);
+    } else {
+      downloadReceipt(bill);
+    }
+
+    // Save Bill is file-only. It keeps the running table open and does not
+    // create a sale. The sale is finalized only when Print is pressed.
+    saveStatus.textContent = `Bill ${bill.billNo} file saved. It will enter Sales Report only after Print.`;
+  } catch (error) {
+    saveStatus.textContent = "Could not save the receipt file. The running table is still available.";
+    console.error("Receipt file save failed", error);
+  } finally {
+    billSaveInProgress = false;
+    document.querySelectorAll("#saveBill, #saveBillBottom").forEach((button) => {
+      button.disabled = false;
+      button.textContent = "Save Bill";
     });
-    const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "Save failed");
-    recordSale(bill);
-    saveStatus.textContent = `Saved in bills folder: ${bill.billNo}`;
-    removeActiveOrder();
-  } catch {
-    downloadReceipt(bill);
-    recordSale(bill);
-    saveStatus.textContent = `Bill saved: ${bill.billNo}`;
-    removeActiveOrder();
   }
-  renderSalesReport();
 }
 
 function downloadReceipt(bill) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(buildBillPdf(bill));
+  const url = URL.createObjectURL(buildBillPdf(bill));
+  link.href = url;
   link.download = `${bill.billNo}.pdf`;
   link.click();
-  URL.revokeObjectURL(link.href);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-function recordSale(bill) {
-  const sale = normalizeSale(bill);
+async function recordSale(bill) {
+  const sale = normalizeSale({
+    ...bill,
+    saleId: bill.saleId || randomId("sale"),
+    deviceId: bill.deviceId || getDeviceId(),
+    syncState: "pending"
+  });
+
+  // localStorage remains a fast report mirror; IndexedDB is the durable source and queue.
   mergeSales([sale]);
   markReportUnsaved(sale.date);
-  upsertSupabaseSale(sale).then(() => {
-    syncSalesFromSupabase();
-  }).catch((error) => {
-    saveStatus.textContent = "Bill saved locally. Supabase sales sync failed.";
-    console.error("Supabase sale save failed", error);
-  });
+
+  try {
+    await GuruOffline.saveSale(sale, { queue: true });
+    GuruOffline.requestBackgroundSync();
+  } catch (error) {
+    // The localStorage mirror still protects the sale on older browsers.
+    console.error("IndexedDB sale save failed", error);
+  }
+
+  await updateSyncStatus();
+  if (navigator.onLine) window.setTimeout(() => syncAll(), 0);
+  return sale;
 }
 
 function loadSales() {
@@ -874,8 +1121,19 @@ function localDateValue(date = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
+function stableTextHash(value) {
+  let hash = 2166136261;
+  for (const character of String(value || "")) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function saleStorageId(bill) {
-  return bill.saleId || `${bill.billNo || "Bill"}`;
+  if (bill.saleId) return bill.saleId;
+  if (bill.id) return String(bill.id);
+  return `legacy-${stableTextHash(`${bill.billNo || "Bill"}|${bill.savedAt || bill.date || ""}`)}`;
 }
 
 function normalizeSale(bill) {
@@ -883,7 +1141,10 @@ function normalizeSale(bill) {
     ...bill,
     saleId: saleStorageId(bill),
     date: bill.date || localDateValue(),
-    savedAt: bill.savedAt || new Date().toISOString()
+    savedAt: bill.savedAt || new Date().toISOString(),
+    items: Array.isArray(bill.items) ? bill.items : [],
+    grandTotal: Number(bill.grandTotal) || 0,
+    syncState: bill.syncState || "synced"
   };
 }
 
@@ -909,22 +1170,24 @@ function saleToSupabase(bill) {
 }
 
 function saleFromSupabase(row) {
-  return normalizeSale(row.bill || {
+  return normalizeSale({
+    ...(row.bill || {}),
     saleId: row.id,
-    billNo: row.bill_no,
-    date: row.sale_date,
-    grandTotal: row.grand_total,
-    savedAt: row.saved_at,
-    items: []
+    billNo: row.bill?.billNo || row.bill_no,
+    date: row.bill?.date || row.sale_date,
+    grandTotal: row.bill?.grandTotal ?? row.grand_total,
+    savedAt: row.bill?.savedAt || row.saved_at,
+    items: row.bill?.items || [],
+    syncState: "synced"
   });
 }
 
 async function upsertSupabaseSale(bill) {
-  const response = await fetch(supabaseSalesEndpoint, {
+  const response = await cloudFetch(supabaseSalesEndpoint, {
     method: "POST",
     headers: supabaseHeaders({
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     }),
     body: JSON.stringify(saleToSupabase(bill))
   });
@@ -932,23 +1195,34 @@ async function upsertSupabaseSale(bill) {
 }
 
 async function fetchSupabaseSales() {
-  const response = await fetch(`${supabaseSalesEndpoint}?select=*&order=saved_at.asc`, {
-    headers: supabaseHeaders()
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return (await response.json()).map(saleFromSupabase);
+  const pageSize = 1000;
+  const rows = [];
+  for (let page = 0; page < 50; page += 1) {
+    const from = page * pageSize;
+    const response = await cloudFetch(`${supabaseSalesEndpoint}?select=*&order=saved_at.asc`, {
+      headers: supabaseHeaders({ Range: `${from}-${from + pageSize - 1}` })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const pageRows = await response.json();
+    rows.push(...pageRows);
+    if (pageRows.length < pageSize) break;
+  }
+  return rows.map(saleFromSupabase);
 }
 
 async function syncSalesFromSupabase({ silent = true } = {}) {
-  if (salesSyncInProgress) return;
+  if (!navigator.onLine || salesSyncInProgress) return;
   salesSyncInProgress = true;
   try {
     const cloudSales = await fetchSupabaseSales();
     mergeSales(cloudSales);
+    if (window.GuruOffline) await GuruOffline.cacheCloudSales(cloudSales);
+    lastCloudSyncAt = new Date().toISOString();
+    localStorage.setItem(lastCloudSyncKey, lastCloudSyncAt);
     renderSalesReport();
-    if (!silent) saveStatus.textContent = "Sales report synced with Supabase.";
+    if (!silent) saveStatus.textContent = "Owner sales refreshed from Supabase.";
   } catch (error) {
-    if (!silent) saveStatus.textContent = "Sales sync failed. Check Supabase sales table.";
+    if (!silent) saveStatus.textContent = "Cloud sales refresh failed. Local billing is still working.";
     console.error("Supabase sales sync failed", error);
   } finally {
     salesSyncInProgress = false;
@@ -958,6 +1232,157 @@ async function syncSalesFromSupabase({ silent = true } = {}) {
 function startSupabaseSalesSync() {
   syncSalesFromSupabase();
   window.setInterval(() => syncSalesFromSupabase(), 30000);
+}
+
+async function replayQueuedChange(entry) {
+  if (entry.kind === "sale-upsert") {
+    await upsertSupabaseSale(entry.payload);
+    return;
+  }
+  if (entry.kind === "menu-upsert") {
+    await upsertSupabaseMenuItem(entry.payload);
+    return;
+  }
+  if (entry.kind === "menu-delete") {
+    await deleteSupabaseMenuItem(entry.payload.id);
+    return;
+  }
+  if (entry.kind === "menu-reset") {
+    const deleteResponse = await cloudFetch(`${supabaseMenuEndpoint}?id=neq.__empty__`, {
+      method: "DELETE",
+      headers: supabaseHeaders({ Prefer: "return=minimal" })
+    });
+    if (!deleteResponse.ok) throw new Error(await deleteResponse.text());
+    const resetItems = entry.payload.items || [];
+    const insertResponse = await cloudFetch(supabaseMenuEndpoint, {
+      method: "POST",
+      headers: supabaseHeaders({
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      }),
+      body: JSON.stringify(resetItems.map((item, index) => menuItemToSupabase(normalizeMenuItem(item), index)))
+    });
+    if (!insertResponse.ok) throw new Error(await insertResponse.text());
+  }
+}
+
+async function flushOfflineQueue({ silent = true } = {}) {
+  if (!navigator.onLine || !window.GuruOffline) {
+    return { synced: 0, pending: pendingSyncCount, menuPending: 0 };
+  }
+  if (queueSyncInProgress) {
+    const current = await GuruOffline.getQueueSummary();
+    return { synced: 0, pending: current.total, menuPending: current.menu };
+  }
+
+  queueSyncInProgress = true;
+  let synced = 0;
+  try {
+    const queue = await GuruOffline.getQueue();
+    for (const entry of queue) {
+      try {
+        await replayQueuedChange(entry);
+        await GuruOffline.completeQueueEntry(entry);
+        synced += 1;
+      } catch (error) {
+        await GuruOffline.failQueueEntry(entry, error);
+        console.error(`Queued ${entry.kind} sync failed`, error);
+        if (!navigator.onLine || error?.name === "AbortError" || error instanceof TypeError) break;
+      }
+    }
+    if (synced && !silent) saveStatus.textContent = `${synced} offline change${synced === 1 ? "" : "s"} uploaded to Supabase.`;
+  } finally {
+    queueSyncInProgress = false;
+    await updateSyncStatus();
+  }
+
+  const summary = await GuruOffline.getQueueSummary();
+  return { synced, pending: summary.total, menuPending: summary.menu };
+}
+
+async function syncAll({ silent = true } = {}) {
+  if (!navigator.onLine) {
+    await updateSyncStatus();
+    if (!silent) saveStatus.textContent = "Offline mode: billing continues and sales will sync later.";
+    return false;
+  }
+  if (fullSyncPromise) return fullSyncPromise;
+
+  fullSyncPromise = (async () => {
+    networkState?.classList.add("syncing");
+    if (networkText) networkText.textContent = "Syncing...";
+    try {
+      const pushed = await flushOfflineQueue({ silent });
+      // Never overwrite an unsynced offline menu with an older cloud copy.
+      if (!pushed.menuPending) await syncMenuFromSupabase({ silent: true });
+      await syncSalesFromSupabase({ silent: true });
+      if (!silent) saveStatus.textContent = pushed.pending
+        ? `${pushed.pending} change${pushed.pending === 1 ? "" : "s"} still waiting for cloud sync.`
+        : "All local sales are safely synced to Supabase.";
+      return pushed.pending === 0;
+    } catch (error) {
+      console.error("Full cloud synchronization failed", error);
+      if (!silent) saveStatus.textContent = "Cloud sync is unavailable. Billing and local saving are still working.";
+      return false;
+    } finally {
+      fullSyncPromise = null;
+      await updateSyncStatus();
+    }
+  })();
+
+  return fullSyncPromise;
+}
+
+async function updateSyncStatus() {
+  let summary = { total: 0, sales: 0, menu: 0, failed: 0 };
+  if (window.GuruOffline) {
+    try {
+      summary = await GuruOffline.getQueueSummary();
+    } catch (error) {
+      console.warn("Could not read offline queue status", error);
+    }
+  }
+
+  pendingSyncCount = summary.total;
+  pendingSalesCount = summary.sales;
+  const online = navigator.onLine;
+  const activelySyncing = queueSyncInProgress || Boolean(fullSyncPromise);
+
+  if (networkState) {
+    networkState.classList.toggle("online", online && !activelySyncing);
+    networkState.classList.toggle("offline", !online);
+    networkState.classList.toggle("syncing", activelySyncing);
+  }
+  if (networkText) networkText.textContent = activelySyncing ? "Syncing with cloud..." : online ? "Online" : "Offline — billing available";
+  if (syncDetail) {
+    syncDetail.textContent = summary.total
+      ? `${summary.sales} sale${summary.sales === 1 ? "" : "s"} and ${summary.menu} menu change${summary.menu === 1 ? "" : "s"} waiting. Stored safely on this device.`
+      : online
+        ? `All changes synced. Last cloud refresh: ${formatSyncTime(lastCloudSyncAt)}.`
+        : "No pending sales. Existing menu and billing remain available offline.";
+  }
+  if (syncNowButton) {
+    syncNowButton.disabled = activelySyncing;
+    syncNowButton.textContent = activelySyncing ? "Syncing..." : summary.total ? `Sync ${summary.total}` : "Sync Now";
+  }
+  if (reportSyncNowButton) reportSyncNowButton.disabled = activelySyncing;
+  renderSalesReport();
+}
+
+async function hydrateOfflineSales() {
+  if (!window.GuruOffline) return;
+  try {
+    await GuruOffline.ready();
+    const durableSales = await GuruOffline.getSales();
+    if (durableSales.length) mergeSales(durableSales);
+  } catch (error) {
+    console.warn("Offline database could not be hydrated", error);
+  }
+}
+
+function startCloudSync() {
+  syncAll();
+  window.setInterval(() => syncAll(), 30000);
 }
 
 function getSavedReportDates() {
@@ -982,40 +1407,135 @@ function markReportSaved(date) {
   setSavedReportDates(getSavedReportDates().concat(date));
 }
 
-function buildDailyReport(date) {
-  const sales = loadSales().filter((sale) => sale.date === date);
-  const total = sales.reduce((sum, sale) => sum + sale.grandTotal, 0);
+function summarizeSales(sales) {
+  const total = sales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
+  const syncedSales = sales.filter((sale) => sale.syncState !== "pending");
+  const pendingSales = sales.filter((sale) => sale.syncState === "pending");
+  const syncedTotal = syncedSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
+  const pendingTotal = pendingSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
   const itemCounts = new Map();
   let drinkCount = 0;
-  let bottleCount = 0;
+  let beverageCount = 0;
+  const alcoholicTypes = new Set(["beer", "whisky", "whiskey", "rum", "vodka", "wine", "gin", "brandy", "tequila"]);
+
   sales.forEach((sale) => {
-    sale.items.forEach((item) => {
-      itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + item.quantity);
-      if (item.kind === "drink" || item.kind === "liquor" || item.category === "Beverages" || item.category === "Drinks") {
-        drinkCount += item.quantity;
-      }
-      if (item.kind === "liquor" || item.category === "Drinks") {
-        bottleCount += item.quantity;
-      }
+    (sale.items || []).forEach((item) => {
+      const quantity = Number(item.quantity) || 0;
+      const category = String(item.category || "").toLowerCase();
+      const kind = String(item.kind || "").toLowerCase();
+      const subcategory = String(item.subcategory || "").toLowerCase();
+      const isAlcoholicDrink = category === "drinks" || kind === "liquor" || alcoholicTypes.has(subcategory);
+      const isBeverage = !isAlcoholicDrink && (category === "beverages" || kind === "drink");
+
+      itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + quantity);
+      if (isAlcoholicDrink) drinkCount += quantity;
+      if (isBeverage) beverageCount += quantity;
     });
   });
-  const sortedItems = [...itemCounts.entries()].sort((a, b) => b[1] - a[1]);
+
   return {
-    reportNo: `Daily-Sales-${date}`,
-    date,
-    dateText: formatDate(date),
     bills: sales.length,
     total,
+    syncedBills: syncedSales.length,
+    pendingBills: pendingSales.length,
+    syncedTotal,
+    pendingTotal,
     drinkCount,
-    bottleCount,
-    topItems: sortedItems,
-    sales,
+    beverageCount,
+    bottleCount: beverageCount,
+    topItems: [...itemCounts.entries()].sort((a, b) => b[1] - a[1]),
+    sales
+  };
+}
+
+function buildDailyReport(date) {
+  const sales = loadSales().filter((sale) => sale.date === date);
+  return {
+    reportNo: `Daily-Sales-${date}`,
+    periodType: "daily",
+    date,
+    dateText: formatDate(date),
+    ...summarizeSales(sales),
+    dailyBreakdown: [],
+    savedAt: new Date().toISOString()
+  };
+}
+
+function formatMonth(value) {
+  const date = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
+function buildMonthlyReport(month) {
+  const sales = loadSales().filter((sale) => String(sale.date || "").startsWith(`${month}-`));
+  const dailyMap = new Map();
+  sales.forEach((sale) => {
+    const existing = dailyMap.get(sale.date) || { date: sale.date, bills: 0, total: 0 };
+    existing.bills += 1;
+    existing.total += Number(sale.grandTotal) || 0;
+    dailyMap.set(sale.date, existing);
+  });
+  const dailyBreakdown = [...dailyMap.values()]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .map((entry) => ({ ...entry, dateText: formatDate(entry.date) }));
+  const summary = summarizeSales(sales);
+
+  return {
+    reportNo: `Monthly-Sales-${month}`,
+    periodType: "monthly",
+    month,
+    dateText: formatMonth(month),
+    ...summary,
+    activeDays: dailyBreakdown.length,
+    averageDailySales: dailyBreakdown.length ? Math.round(summary.total / dailyBreakdown.length) : 0,
+    dailyBreakdown,
     savedAt: new Date().toISOString()
   };
 }
 
 function selectedReportDate() {
-  return todayValue();
+  return reportDateFilter?.value || todayValue();
+}
+
+function selectedReportMonth() {
+  return reportMonthFilter?.value || todayValue().slice(0, 7);
+}
+
+function currentSalesReport() {
+  return reportPeriodSelect?.value === "monthly"
+    ? buildMonthlyReport(selectedReportMonth())
+    : buildDailyReport(selectedReportDate());
+}
+
+function updateReportPeriodControls() {
+  const monthly = reportPeriodSelect?.value === "monthly";
+  setFieldVisibility(reportDateField, !monthly);
+  setFieldVisibility(reportMonthField, monthly);
+  if (reportCurrentButton) reportCurrentButton.textContent = monthly ? "This Month" : "Today";
+}
+
+function shiftReportPeriod(amount) {
+  const monthly = reportPeriodSelect?.value === "monthly";
+  if (monthly) {
+    const [year, month] = selectedReportMonth().split("-").map(Number);
+    const date = new Date(year, month - 1 + amount, 1, 12, 0, 0);
+    reportMonthFilter.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  } else {
+    const date = new Date(`${selectedReportDate()}T12:00:00`);
+    date.setDate(date.getDate() + amount);
+    reportDateFilter.value = localDateValue(date);
+  }
+  showAllTopItems = false;
+  renderSalesReport();
+}
+
+function selectCurrentReportPeriod() {
+  const today = todayValue();
+  if (reportPeriodSelect?.value === "monthly") reportMonthFilter.value = today.slice(0, 7);
+  else reportDateFilter.value = today;
+  showAllTopItems = false;
+  renderSalesReport();
 }
 
 function dailyReportHtml(report) {
@@ -1031,8 +1551,8 @@ function dailyReportHtml(report) {
       <div class="receipt-meta">
         <span>Bills: ${report.bills}</span>
         <span>Sales: ${currency.format(report.total)}</span>
-        <span>Drinks Sold: ${report.drinkCount}</span>
-        <span>Bottles Sold: ${report.bottleCount}</span>
+        <span>Alcoholic Drinks Sold: ${report.drinkCount}</span>
+        <span>Beverages Sold: ${report.beverageCount ?? report.bottleCount ?? 0}</span>
       </div>
       <h3>Top Items</h3>
       <table><tbody>${itemRows || "<tr><td>No sales</td><td></td><td></td></tr>"}</tbody></table>
@@ -1108,9 +1628,8 @@ async function archiveOldSales() {
     await saveDailyReport(date);
   }
 
-  const refreshedSavedDates = getSavedReportDates();
-  const keepDates = new Set([currentDate, ...oldDates.filter((date) => !refreshedSavedDates.includes(date))]);
-  saveSales(sales.filter((sale) => keepDates.has(sale.date)));
+  // Keep historical sales available for the calendar and monthly reports.
+  // Supabase remains the cloud source of truth, while local history supports offline viewing.
   renderSalesReport();
 }
 
@@ -1129,26 +1648,67 @@ function scheduleDailyRollover() {
 
 function renderSalesReport() {
   if (!salesReport) return;
-  const reportDate = selectedReportDate();
-  const report = buildDailyReport(reportDate);
+  const report = currentSalesReport();
+  const isMonthly = report.periodType === "monthly";
   const sortedItems = report.topItems;
   const topItems = showAllTopItems ? sortedItems : sortedItems.slice(0, 5);
+  const online = navigator.onLine;
+  const billHistory = [...report.sales]
+    .sort((a, b) => String(b.savedAt || b.date || "").localeCompare(String(a.savedAt || a.date || "")))
+    .slice(0, 100);
+  const monthlyBreakdown = isMonthly ? `
+    <div class="report-card-wide">
+      <span>Daily Sales in ${report.dateText}</span>
+      <section class="report-period-list">
+        ${report.dailyBreakdown.length ? report.dailyBreakdown.map((entry) => `
+          <p class="report-period-row">
+            <strong>${entry.dateText}</strong>
+            <small>${entry.bills} bill${entry.bills === 1 ? "" : "s"}</small>
+            <b>${currency.format(entry.total)}</b>
+          </p>`).join("") : `<p class="report-empty-line"><strong>No sales in ${report.dateText}</strong><small>Select another month or press Refresh Cloud</small></p>`}
+      </section>
+    </div>` : "";
+
   salesReport.innerHTML = `
     <div class="report-card-wide report-date-card">
-      <span>Report Date</span>
+      <span>${isMonthly ? "Monthly Sales Report" : "Daily Sales Report"}</span>
       <strong>${report.dateText}</strong>
-      <small>Daily sales report shows bills after you save bills for this date.</small>
+      <small>Use the calendar and Previous/Next buttons to open earlier reports. Refresh Cloud downloads previous Supabase sales.</small>
     </div>
-    <div><span>Total Bills</span><strong>${report.bills}</strong></div>
-    <div><span>Total Sales</span><strong>${currency.format(report.total)}</strong></div>
-    <div><span>Drinks Sold</span><strong>${report.drinkCount}</strong></div>
-    <div><span>Bottles Sold</span><strong>${report.bottleCount}</strong></div>
+    <div><span>All Bills</span><strong>${report.bills}</strong><small>Cloud + this device</small></div>
+    <div><span>All Sales</span><strong>${currency.format(report.total)}</strong><small>Includes pending offline bills</small></div>
+    <div class="report-sync-card"><span>Cloud Bills</span><strong class="synced-value">${report.syncedBills}</strong><small>Visible to owner</small></div>
+    <div class="report-sync-card"><span>Cloud Sales</span><strong class="synced-value">${currency.format(report.syncedTotal)}</strong><small>Confirmed in local cloud cache</small></div>
+    ${isMonthly ? `<div><span>Active Sales Days</span><strong>${report.activeDays}</strong><small>Days containing printed bills</small></div>
+    <div><span>Average Per Sales Day</span><strong>${currency.format(report.averageDailySales)}</strong><small>Monthly sales ÷ active days</small></div>` : ""}
+    <div class="report-sync-card"><span>Pending Upload</span><strong class="${report.pendingBills ? "pending-value" : "synced-value"}">${report.pendingBills}</strong><small>${currency.format(report.pendingTotal)} stored safely</small></div>
+    <div class="report-sync-card"><span>Connection</span><strong class="${online ? "online-value" : "pending-value"}">${online ? "Online" : "Offline"}</strong><small>${pendingSyncCount} total queued change${pendingSyncCount === 1 ? "" : "s"}</small></div>
+    <div><span>Alcoholic Drinks Sold</span><strong>${report.drinkCount}</strong><small>Beer, whisky, rum, vodka, wine, etc.</small></div>
+    <div><span>Beverages Sold</span><strong>${report.beverageCount}</strong><small>Water, soda, cold drinks and other beverages</small></div>
+    <div class="report-card-wide report-sync-card">
+      <span>Last Supabase Refresh</span>
+      <strong>${formatSyncTime(lastCloudSyncAt)}</strong>
+      <small>Use Refresh Cloud to pull the latest owner view immediately.</small>
+    </div>
+    ${monthlyBreakdown}
     <div class="report-card-wide">
       <span>Top Items</span>
       <section class="top-items-list">
-        ${topItems.length ? topItems.map(([name, qty], index) => `<p><strong>${index + 1}. ${name}</strong><small>${qty} sold</small></p>`).join("") : `<p class="report-empty-line"><strong>No saved sales for ${report.dateText}</strong><small>Save a bill first</small></p>`}
+        ${topItems.length ? topItems.map(([name, qty], index) => `<p><strong>${index + 1}. ${name}</strong><small>${qty} sold</small></p>`).join("") : `<p class="report-empty-line"><strong>No printed sales for ${report.dateText}</strong><small>Select another period or print a completed bill</small></p>`}
       </section>
       ${sortedItems.length > 5 ? `<button class="report-toggle" type="button" data-toggle-top-items>${showAllTopItems ? "Show Top 5" : `View All ${sortedItems.length}`}</button>` : ""}
+    </div>
+    <div class="report-card-wide">
+      <span>Bills in ${report.dateText}</span>
+      <section class="report-bill-history">
+        ${billHistory.length ? billHistory.map((sale) => `
+          <p class="report-bill-row">
+            <strong>${sale.billNo || "Bill"}</strong>
+            <small>${formatDate(sale.date)} · ${sale.table || "No table"}${sale.syncState === "pending" ? " · Pending upload" : ""}</small>
+            <b>${currency.format(sale.grandTotal)}</b>
+          </p>`).join("") : `<p class="report-empty-line"><strong>No bills found</strong><small>Try another date/month or refresh cloud data</small></p>`}
+      </section>
+      ${report.sales.length > 100 ? `<small>Showing the latest 100 of ${report.sales.length} bills.</small>` : ""}
     </div>`;
 }
 
@@ -1219,11 +1779,15 @@ async function saveMenuItem(event) {
   quantities.set(id, quantities.get(id) || 0);
   saveMenu();
   try {
-    await upsertSupabaseMenuItem(item);
-    saveStatus.textContent = "Menu item synced to Supabase.";
+    await GuruOffline.queueMenuUpsert({ ...item, sort_order: items.findIndex((menuItem) => menuItem.id === id) });
+    GuruOffline.requestBackgroundSync();
+    saveStatus.textContent = navigator.onLine
+      ? "Menu item saved. Cloud sync is running."
+      : "Menu item saved offline. It will sync automatically.";
+    if (navigator.onLine) window.setTimeout(() => syncAll(), 0);
   } catch (error) {
-    saveStatus.textContent = "Saved on this device. Supabase sync failed.";
-    console.error("Supabase menu save failed", error);
+    saveStatus.textContent = "Menu item saved on this device, but the sync queue was unavailable.";
+    console.error("Offline menu queue failed", error);
   }
   resetMenuForm();
   renderItems();
@@ -1256,13 +1820,20 @@ function syncDrinkTypeField() {
 }
 
 function openAdminPanel(panelId) {
+  if (panelId === "salesReportPanel" && !ownerReportUnlocked) {
+    openOwnerPinModal("unlock");
+    return;
+  }
   document.querySelectorAll(".admin-modal").forEach((panel) => {
     const isTarget = panel.id === panelId;
     panel.classList.toggle("modal-open", isTarget);
     panel.setAttribute("aria-hidden", String(!isTarget));
   });
   document.body.classList.add("modal-active");
-  if (panelId === "salesReportPanel") renderSalesReport();
+  if (panelId === "salesReportPanel") {
+    renderSalesReport();
+    if (navigator.onLine) syncAll();
+  }
 }
 
 function closeAdminPanels() {
@@ -1270,8 +1841,86 @@ function closeAdminPanels() {
     panel.classList.remove("modal-open");
     panel.setAttribute("aria-hidden", "true");
   });
+  ownerReportUnlocked = false;
   document.body.classList.remove("modal-active");
 }
+
+ownerPinForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  ownerPinError.textContent = "";
+  const data = new FormData(ownerPinForm);
+  const unlockPassword = String(data.get("unlockPassword") || "");
+  const currentPassword = String(data.get("currentPassword") || "");
+  const newPassword = String(data.get("newPassword") || "");
+  const confirmation = String(data.get("confirmPassword") || "");
+
+  if (ownerPinMode !== "setup") {
+    const remaining = ownerPinLockSeconds();
+    if (remaining) {
+      ownerPinError.textContent = `Too many attempts. Try again in ${remaining} seconds.`;
+      return;
+    }
+  }
+
+  if ((ownerPinMode === "setup" || ownerPinMode === "change") && newPassword.length < 4) {
+    ownerPinError.textContent = "Password must contain at least 4 characters.";
+    ownerPinForm.elements.namedItem("newPassword")?.focus();
+    return;
+  }
+  if ((ownerPinMode === "setup" || ownerPinMode === "change") && newPassword !== confirmation) {
+    ownerPinError.textContent = "The new passwords do not match.";
+    ownerPinForm.elements.namedItem("confirmPassword")?.focus();
+    return;
+  }
+
+  ownerPinSubmit.disabled = true;
+  try {
+    if (ownerPinMode === "setup") {
+      await storeOwnerPassword(newPassword);
+      ownerReportUnlocked = true;
+      closeOwnerPinModal();
+      openAdminPanel("salesReportPanel");
+      saveStatus.textContent = "Owner password created. Sales Report is unlocked.";
+      return;
+    }
+
+    const passwordToVerify = ownerPinMode === "change" ? currentPassword : unlockPassword;
+    const valid = await verifyOwnerPassword(passwordToVerify);
+    if (!valid) {
+      const lockedFor = registerOwnerPinFailure();
+      ownerPinError.textContent = lockedFor
+        ? "Five incorrect attempts. Report locked for 30 seconds."
+        : "Incorrect owner password.";
+      const fieldName = ownerPinMode === "change" ? "currentPassword" : "unlockPassword";
+      ownerPinForm.elements.namedItem(fieldName)?.select();
+      return;
+    }
+
+    resetOwnerPinFailures();
+    if (ownerPinMode === "change") {
+      await storeOwnerPassword(newPassword);
+      ownerReportUnlocked = true;
+      closeOwnerPinModal();
+      saveStatus.textContent = "Owner password changed successfully. Sales Report remains unlocked.";
+      return;
+    }
+
+    ownerReportUnlocked = true;
+    closeOwnerPinModal();
+    openAdminPanel("salesReportPanel");
+  } catch (error) {
+    ownerPinError.textContent = "Password operation failed. Please try again.";
+    console.error("Owner password operation failed", error);
+  } finally {
+    ownerPinSubmit.disabled = false;
+  }
+});
+
+ownerPinCancel?.addEventListener("click", closeOwnerPinModal);
+ownerPinModal?.addEventListener("click", (event) => {
+  if (event.target === ownerPinModal) closeOwnerPinModal();
+});
+changeOwnerPinButton?.addEventListener("click", () => openOwnerPinModal("change"));
 
 itemsGrid.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
@@ -1337,9 +1986,16 @@ menuTable.addEventListener("click", (event) => {
     items = items.filter((menuItem) => menuItem.id !== deleteId);
     quantities.delete(deleteId);
     saveMenu();
-    deleteSupabaseMenuItem(deleteId).catch((error) => {
-      saveStatus.textContent = "Deleted on this device. Supabase sync failed.";
-      console.error("Supabase menu delete failed", error);
+    GuruOffline.queueMenuDelete(deleteId).then(async () => {
+      GuruOffline.requestBackgroundSync();
+      saveStatus.textContent = navigator.onLine
+        ? "Menu deletion saved. Cloud sync is running."
+        : "Menu deletion saved offline. It will sync automatically.";
+      await updateSyncStatus();
+      if (navigator.onLine) syncAll();
+    }).catch((error) => {
+      saveStatus.textContent = "Deleted on this device, but the sync queue was unavailable.";
+      console.error("Offline menu delete queue failed", error);
     });
     renderItems();
     renderBill();
@@ -1384,7 +2040,9 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeAdminPanels();
+  if (event.key !== "Escape") return;
+  if (ownerPinModal && !ownerPinModal.hidden) closeOwnerPinModal();
+  else closeAdminPanels();
 });
 
 menuForm.addEventListener("submit", saveMenuItem);
@@ -1398,31 +2056,28 @@ menuItemSubcategory.addEventListener("change", suggestMenuItemPhoto);
 document.querySelector("#cancelEdit").addEventListener("click", () => {
   resetMenuForm();
 });
-document.querySelector("#resetMenu").addEventListener("click", () => {
+document.querySelector("#resetMenu").addEventListener("click", async () => {
+  if (!window.confirm("Reset the complete menu to default items?")) return;
   items = [...defaultItems];
   quantities.clear();
   items.forEach((item) => quantities.set(item.id, 0));
-  localStorage.removeItem(menuKey);
-  fetch(`${supabaseMenuEndpoint}?id=neq.__empty__`, {
-    method: "DELETE",
-    headers: supabaseHeaders()
-  }).then(() => fetch(supabaseMenuEndpoint, {
-    method: "POST",
-    headers: supabaseHeaders({
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates"
-    }),
-    body: JSON.stringify(items.map((item, index) => menuItemToSupabase(normalizeMenuItem(item), index)))
-  })).then(() => {
-    saveStatus.textContent = "Default menu synced to Supabase.";
-  }).catch((error) => {
-    saveStatus.textContent = "Default menu reset locally. Supabase sync failed.";
-    console.error("Supabase menu reset failed", error);
-  });
+  saveMenu();
+  try {
+    await GuruOffline.queueMenuReset(items);
+    GuruOffline.requestBackgroundSync();
+    saveStatus.textContent = navigator.onLine
+      ? "Default menu restored. Cloud sync is running."
+      : "Default menu restored offline. It will sync automatically.";
+    if (navigator.onLine) syncAll();
+  } catch (error) {
+    saveStatus.textContent = "Default menu restored locally, but the sync queue was unavailable.";
+    console.error("Offline menu reset queue failed", error);
+  }
   resetMenuForm();
   renderItems();
   renderBill();
   renderMenuTable();
+  updateSyncStatus();
 });
 document.querySelector("#clearQty").addEventListener("click", () => {
   items.forEach((item) => quantities.set(item.id, 0));
@@ -1431,14 +2086,43 @@ document.querySelector("#clearQty").addEventListener("click", () => {
   saveActiveOrder();
 });
 function printCurrentBill() {
+  if (billSaveInProgress) return;
   const bill = prepareReceipt();
   if (!bill.items.length) {
     saveStatus.textContent = "Add items before printing bill.";
     return;
   }
-  recordSale(bill);
-  renderSalesReport();
+
+  // In this POS, Print also finalizes the sale. The local record is created
+  // immediately, then IndexedDB/Supabase synchronization continues safely.
+  billSaveInProgress = true;
+  document.querySelectorAll("#printBill, #printBillBottom, #saveBill, #saveBillBottom").forEach((button) => {
+    button.disabled = true;
+  });
+
+  const finalization = recordSale(bill)
+    .then((sale) => {
+      saveStatus.textContent = navigator.onLine
+        ? `Bill ${sale.billNo} printed and saved. Cloud sync is running.`
+        : `Bill ${sale.billNo} printed and saved offline. It will upload automatically.`;
+      removeActiveOrder();
+      renderSalesReport();
+      updateSyncStatus();
+    })
+    .catch((error) => {
+      saveStatus.textContent = "Printing opened, but the sale could not be finalized. The running table was kept.";
+      console.error("Print finalization failed", error);
+    })
+    .finally(() => {
+      billSaveInProgress = false;
+      document.querySelectorAll("#printBill, #printBillBottom, #saveBill, #saveBillBottom").forEach((button) => {
+        button.disabled = false;
+      });
+    });
+
+  // Open the print dialog while the click still has browser user activation.
   window.print();
+  return finalization;
 }
 
 document.addEventListener("click", (event) => {
@@ -1464,6 +2148,68 @@ salesReport.addEventListener("click", (event) => {
   showAllTopItems = !showAllTopItems;
   renderSalesReport();
 });
+
+reportPeriodSelect?.addEventListener("change", () => {
+  showAllTopItems = false;
+  updateReportPeriodControls();
+  renderSalesReport();
+});
+
+[reportDateFilter, reportMonthFilter].forEach((input) => input?.addEventListener("change", () => {
+  showAllTopItems = false;
+  renderSalesReport();
+}));
+
+reportPreviousButton?.addEventListener("click", () => shiftReportPeriod(-1));
+reportNextButton?.addEventListener("click", () => shiftReportPeriod(1));
+reportCurrentButton?.addEventListener("click", selectCurrentReportPeriod);
+
+syncNowButton?.addEventListener("click", () => syncAll({ silent: false }));
+reportSyncNowButton?.addEventListener("click", async () => {
+  await syncAll({ silent: false });
+  renderSalesReport();
+});
+
+installAppButton?.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installAppButton.hidden = true;
+});
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (installAppButton) installAppButton.hidden = false;
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  if (installAppButton) installAppButton.hidden = true;
+  saveStatus.textContent = "Guru POS installed. It can now open like a mobile app.";
+});
+
+window.addEventListener("online", () => {
+  saveStatus.textContent = "Internet restored. Uploading offline sales...";
+  updateSyncStatus();
+  syncAll({ silent: false });
+});
+
+window.addEventListener("offline", () => {
+  saveStatus.textContent = "Internet unavailable. Offline billing is active and safe.";
+  updateSyncStatus();
+});
+
+window.addEventListener("guru-queue-change", updateSyncStatus);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    updateSyncStatus();
+    if (navigator.onLine) syncAll();
+  }
+});
+
 [billNo, billDate, tableNo, customerName, gstRate].forEach((input) => input.addEventListener("input", () => {
   renderBill();
   saveActiveOrder();
@@ -1474,14 +2220,59 @@ gstEnabled.addEventListener("change", () => {
 });
 billDate.addEventListener("change", renderSalesReport);
 
-setToday();
-syncDrinkTypeField();
-initializeTableOrders();
-renderItems();
-renderMenuTable();
-renderBill();
-renderSalesReport();
-archiveOldSales();
-scheduleDailyRollover();
-startSupabaseMenuSync();
-startSupabaseSalesSync();
+async function registerPosServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    if (registration.waiting) saveStatus.textContent = "An app update is ready. Reopen Guru POS after finishing the current bill.";
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          saveStatus.textContent = "A new Guru POS version is ready. Reopen after finishing the current bill.";
+        }
+      });
+    });
+  } catch (error) {
+    console.error("PWA service worker registration failed", error);
+  }
+
+  navigator.serviceWorker.addEventListener("message", async (event) => {
+    if (event.data?.type === "GURU_SYNC_COMPLETE") {
+      await hydrateOfflineSales();
+      await updateSyncStatus();
+      if (navigator.onLine) syncSalesFromSupabase();
+    }
+    if (event.data?.type === "GURU_SYNC_FAILED") updateSyncStatus();
+  });
+}
+
+async function initializeApplication() {
+  setToday();
+  if (reportDateFilter) reportDateFilter.value = todayValue();
+  if (reportMonthFilter) reportMonthFilter.value = todayValue().slice(0, 7);
+  updateReportPeriodControls();
+  syncDrinkTypeField();
+  migrateRunningBillNumbers();
+  initializeTableOrders();
+  renderItems();
+  renderMenuTable();
+  renderBill();
+  renderSalesReport();
+
+  await registerPosServiceWorker();
+  await hydrateOfflineSales();
+  await updateSyncStatus();
+  renderSalesReport();
+
+  archiveOldSales();
+  scheduleDailyRollover();
+  startCloudSync();
+
+  if (window.matchMedia("(display-mode: standalone)").matches && installAppButton) {
+    installAppButton.hidden = true;
+  }
+  if (location.hash === "#sales-report") openAdminPanel("salesReportPanel");
+}
+
+initializeApplication();

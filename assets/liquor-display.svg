@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Liquor bottles on a bar counter</title>
+  <desc id="desc">A warm bar shelf with assorted liquor bottles for the Guru Bar and Restaurant billing screen.</desc>
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#412117"/>
+      <stop offset="0.55" stop-color="#7a3b21"/>
+      <stop offset="1" stop-color="#d1a04a"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset=".36" stop-color="#ffffff" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".34"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#1d100b" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <rect width="960" height="420" fill="url(#wall)"/>
+  <rect x="0" y="280" width="960" height="140" fill="#2b1712"/>
+  <rect x="0" y="284" width="960" height="22" fill="#9c6b32"/>
+  <g opacity=".24">
+    <circle cx="140" cy="86" r="58" fill="#f7ca6a"/>
+    <circle cx="780" cy="102" r="76" fill="#f7ca6a"/>
+    <circle cx="510" cy="56" r="44" fill="#fff0b5"/>
+  </g>
+  <g filter="url(#shadow)">
+    <g transform="translate(92 82)">
+      <rect x="38" y="0" width="42" height="74" rx="9" fill="#235c4a"/>
+      <path d="M22 72h74l16 164c2 24-15 44-39 44H45c-24 0-41-20-39-44L22 72z" fill="#235c4a"/>
+      <rect x="31" y="140" width="58" height="48" rx="6" fill="#f7ead0"/>
+      <path d="M74 84c20 46 22 104 14 158" stroke="url(#glass)" stroke-width="9" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(226 54)">
+      <rect x="46" y="0" width="48" height="94" rx="10" fill="#7a2717"/>
+      <path d="M26 88h88l18 188c2 26-17 48-43 48H51c-26 0-45-22-43-48L26 88z" fill="#7a2717"/>
+      <rect x="38" y="168" width="64" height="52" rx="6" fill="#fff5dc"/>
+      <path d="M86 105c22 56 25 126 12 186" stroke="url(#glass)" stroke-width="10" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(382 96)">
+      <rect x="42" y="0" width="44" height="70" rx="9" fill="#d1a04a"/>
+      <path d="M24 66h80l14 154c2 24-15 44-39 44H49c-24 0-41-20-39-44L24 66z" fill="#d1a04a"/>
+      <rect x="35" y="136" width="58" height="44" rx="6" fill="#fff8e7"/>
+      <path d="M78 82c19 42 20 96 11 142" stroke="url(#glass)" stroke-width="9" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(520 42)">
+      <rect x="45" y="0" width="50" height="98" rx="10" fill="#243c5a"/>
+      <path d="M25 92h90l18 198c2 28-18 50-45 50H52c-27 0-47-22-45-50L25 92z" fill="#243c5a"/>
+      <rect x="38" y="178" width="66" height="54" rx="6" fill="#f8edd8"/>
+      <path d="M88 110c24 62 25 136 12 199" stroke="url(#glass)" stroke-width="10" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(682 88)">
+      <rect x="40" y="0" width="42" height="76" rx="9" fill="#8e3947"/>
+      <path d="M22 72h78l15 160c2 24-16 44-40 44H47c-24 0-42-20-40-44L22 72z" fill="#8e3947"/>
+      <rect x="34" y="144" width="56" height="46" rx="6" fill="#fff5e6"/>
+      <path d="M76 86c20 44 21 100 12 150" stroke="url(#glass)" stroke-width="9" stroke-linecap="round"/>
+    </g>
+  </g>
+  <g fill="#1f100c" opacity=".25">
+    <ellipse cx="154" cy="360" rx="82" ry="13"/>
+    <ellipse cx="300" cy="366" rx="92" ry="14"/>
+    <ellipse cx="448" cy="358" rx="82" ry="12"/>
+    <ellipse cx="596" cy="370" rx="96" ry="15"/>
+    <ellipse cx="742" cy="360" rx="86" ry="13"/>
+  </g>
+</svg>
