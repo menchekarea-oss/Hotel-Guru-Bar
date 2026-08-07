@@ -136,6 +136,7 @@ const lastCloudSyncKey = "hotelGuruLastCloudSync";
 const ownerPinKey = "hotelGuruOwnerPin";
 const ownerPinFailuresKey = "hotelGuruOwnerPinFailures";
 const ownerPinLockUntilKey = "hotelGuruOwnerPinLockUntil";
+const gstDefaultOffMigrationKey = "hotelGuruGstDefaultOffV11";
 const reportResetHour = 2;
 const cloudRequestTimeout = 10000;
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
@@ -163,6 +164,9 @@ let lastCloudSyncAt = localStorage.getItem(lastCloudSyncKey) || "";
 let deferredInstallPrompt = null;
 let ownerReportUnlocked = false;
 let ownerPinMode = "unlock";
+let serviceWorkerRegistration = null;
+let pendingServiceWorker = null;
+let reloadingForAppUpdate = false;
 
 const itemsGrid = document.querySelector("#itemsGrid");
 const billLines = document.querySelector("#billLines");
@@ -210,6 +214,8 @@ const reportDateField = document.querySelector("#reportDateField");
 const reportDateFilter = document.querySelector("#reportDateFilter");
 const reportMonthField = document.querySelector("#reportMonthField");
 const reportMonthFilter = document.querySelector("#reportMonthFilter");
+const openReportDatePickerButton = document.querySelector("#openReportDatePicker");
+const openReportMonthPickerButton = document.querySelector("#openReportMonthPicker");
 const reportPreviousButton = document.querySelector("#reportPrevious");
 const reportCurrentButton = document.querySelector("#reportCurrent");
 const reportNextButton = document.querySelector("#reportNext");
@@ -222,6 +228,9 @@ const ownerPinError = document.querySelector("#ownerPinError");
 const ownerPinSubmit = document.querySelector("#ownerPinSubmit");
 const ownerPinCancel = document.querySelector("#ownerPinCancel");
 const changeOwnerPinButton = document.querySelector("#changeOwnerPin");
+const appUpdateBar = document.querySelector("#appUpdateBar");
+const updateAppNowButton = document.querySelector("#updateAppNow");
+const updateLaterButton = document.querySelector("#updateLater");
 
 function loadMenu() {
   try {
@@ -606,6 +615,16 @@ function migrateRunningBillNumbers() {
   if (changed) saveTableOrders(orders);
 }
 
+function migrateGstDefaultOff() {
+  if (localStorage.getItem(gstDefaultOffMigrationKey)) return;
+  const orders = loadTableOrders();
+  Object.values(orders).forEach((order) => {
+    order.gstEnabled = false;
+  });
+  saveTableOrders(orders);
+  localStorage.setItem(gstDefaultOffMigrationKey, "1");
+}
+
 function quantityObject() {
   return Object.fromEntries(items.map((item) => [item.id, quantities.get(item.id) || 0]).filter((entry) => entry[1] > 0));
 }
@@ -652,7 +671,7 @@ function createTableOrder(tableLabel) {
     table: label,
     customer: "",
     date: billDate.value || todayValue(),
-    gstEnabled: true,
+    gstEnabled: false,
     gstRate: "5",
     quantities: {},
     updatedAt: new Date().toISOString()
@@ -674,7 +693,7 @@ function setActiveOrder(id) {
   tableNo.value = order.table || "";
   customerName.value = order.customer || "";
   billDate.value = order.date || todayValue();
-  gstEnabled.checked = order.gstEnabled !== false;
+  gstEnabled.checked = order.gstEnabled === true;
   gstRate.value = order.gstRate || "5";
   restoreQuantities(order.quantities);
   isRestoringOrder = false;
@@ -800,16 +819,16 @@ function renderItems() {
   const visibleItems = items.filter(passesFilter);
   itemsGrid.innerHTML = visibleItems.length
     ? visibleItems.map((item) => `
-      <article class="item-card">
+      <article class="item-card ${(quantities.get(item.id) || 0) > 0 ? "has-quantity" : ""}">
         <img class="item-image" src="${itemImage(item)}" alt="${item.name}" data-fallback="${fallbackImage(item)}" />
         <div class="item-detail">
           <span class="item-category">${item.category === "Drinks" ? drinkSubcategory(item) : isSnackItem(item) ? "Snacks" : item.category}</span>
           <h3>${item.name}</h3>
           <span class="item-price">${currency.format(item.price)}</span>
           <div class="qty-row" aria-label="${item.name} quantity">
-            <button type="button" data-action="decrement" data-id="${item.id}" title="Decrease quantity">-</button>
+            <button type="button" data-action="decrement" data-id="${item.id}" title="Decrease quantity" aria-label="Decrease ${item.name} quantity">−</button>
             <input type="number" min="0" step="1" value="${quantities.get(item.id) || 0}" data-id="${item.id}" aria-label="${item.name} quantity" />
-            <button type="button" data-action="increment" data-id="${item.id}" title="Increase quantity">+</button>
+            <button type="button" data-action="increment" data-id="${item.id}" title="Increase quantity" aria-label="Increase ${item.name} quantity">+</button>
           </div>
         </div>
       </article>`).join("")
@@ -826,7 +845,10 @@ function updateQuantity(id, nextQuantity) {
   const quantity = Math.max(0, Number.parseInt(nextQuantity, 10) || 0);
   quantities.set(id, quantity);
   const input = itemsGrid.querySelector(`input[data-id="${id}"]`);
-  if (input) input.value = quantity;
+  if (input) {
+    input.value = quantity;
+    input.closest(".item-card")?.classList.toggle("has-quantity", quantity > 0);
+  }
   renderBill();
   saveActiveOrder();
 }
@@ -1019,8 +1041,17 @@ async function chooseBillsFolder() {
     saveStatus.textContent = "Folder picker is not available on this device. Receipts will download normally; sale data still saves offline.";
     return;
   }
-  billsDirectoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-  saveStatus.textContent = "Bills folder selected. Future bills will save there.";
+  try {
+    billsDirectoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    saveStatus.textContent = "Bills folder selected. Future bills will save there.";
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      saveStatus.textContent = "Folder selection cancelled. Bills can still download normally.";
+      return;
+    }
+    saveStatus.textContent = "Could not open that folder. Bills can still download normally.";
+    console.error("Bills folder selection failed", error);
+  }
 }
 
 async function saveWithFolderPicker(bill) {
@@ -1416,7 +1447,9 @@ function summarizeSales(sales) {
   const itemCounts = new Map();
   let drinkCount = 0;
   let beverageCount = 0;
+  let foodCount = 0;
   const alcoholicTypes = new Set(["beer", "whisky", "whiskey", "rum", "vodka", "wine", "gin", "brandy", "tequila"]);
+  const foodCategories = new Set(["thali", "snacks", "starter", "curry", "rice", "roti", "food"]);
 
   sales.forEach((sale) => {
     (sale.items || []).forEach((item) => {
@@ -1426,10 +1459,12 @@ function summarizeSales(sales) {
       const subcategory = String(item.subcategory || "").toLowerCase();
       const isAlcoholicDrink = category === "drinks" || kind === "liquor" || alcoholicTypes.has(subcategory);
       const isBeverage = !isAlcoholicDrink && (category === "beverages" || kind === "drink");
+      const isFood = !isAlcoholicDrink && !isBeverage && (kind === "food" || foodCategories.has(category));
 
       itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + quantity);
       if (isAlcoholicDrink) drinkCount += quantity;
       if (isBeverage) beverageCount += quantity;
+      if (isFood) foodCount += quantity;
     });
   });
 
@@ -1442,6 +1477,7 @@ function summarizeSales(sales) {
     pendingTotal,
     drinkCount,
     beverageCount,
+    foodCount,
     bottleCount: beverageCount,
     topItems: [...itemCounts.entries()].sort((a, b) => b[1] - a[1]),
     sales
@@ -1551,6 +1587,7 @@ function dailyReportHtml(report) {
       <div class="receipt-meta">
         <span>Bills: ${report.bills}</span>
         <span>Sales: ${currency.format(report.total)}</span>
+        <span>Kitchen / Food Items Sold: ${report.foodCount ?? 0}</span>
         <span>Alcoholic Drinks Sold: ${report.drinkCount}</span>
         <span>Beverages Sold: ${report.beverageCount ?? report.bottleCount ?? 0}</span>
       </div>
@@ -1655,63 +1692,116 @@ function renderSalesReport() {
   const online = navigator.onLine;
   const billHistory = [...report.sales]
     .sort((a, b) => String(b.savedAt || b.date || "").localeCompare(String(a.savedAt || a.date || "")))
-    .slice(0, 100);
+    .slice(0, 50);
+
+  const monthlyKpis = isMonthly ? `
+    <article class="report-kpi-card">
+      <span>Active Days</span>
+      <strong>${report.activeDays}</strong>
+      <small>Days with printed bills</small>
+    </article>
+    <article class="report-kpi-card">
+      <span>Daily Average</span>
+      <strong>${currency.format(report.averageDailySales)}</strong>
+      <small>Average per active day</small>
+    </article>` : "";
+
   const monthlyBreakdown = isMonthly ? `
-    <div class="report-card-wide">
-      <span>Daily Sales in ${report.dateText}</span>
+    <details class="report-disclosure report-card-wide">
+      <summary>
+        <span>Day-by-day sales</span>
+        <small>${report.activeDays} active day${report.activeDays === 1 ? "" : "s"}</small>
+      </summary>
       <section class="report-period-list">
         ${report.dailyBreakdown.length ? report.dailyBreakdown.map((entry) => `
           <p class="report-period-row">
             <strong>${entry.dateText}</strong>
             <small>${entry.bills} bill${entry.bills === 1 ? "" : "s"}</small>
             <b>${currency.format(entry.total)}</b>
-          </p>`).join("") : `<p class="report-empty-line"><strong>No sales in ${report.dateText}</strong><small>Select another month or press Refresh Cloud</small></p>`}
+          </p>`).join("") : `<p class="report-empty-line"><strong>No sales in ${report.dateText}</strong><small>Select another month or refresh cloud</small></p>`}
       </section>
-    </div>` : "";
+    </details>` : "";
 
   salesReport.innerHTML = `
-    <div class="report-card-wide report-date-card">
-      <span>${isMonthly ? "Monthly Sales Report" : "Daily Sales Report"}</span>
-      <strong>${report.dateText}</strong>
-      <small>Use the calendar and Previous/Next buttons to open earlier reports. Refresh Cloud downloads previous Supabase sales.</small>
-    </div>
-    <div><span>All Bills</span><strong>${report.bills}</strong><small>Cloud + this device</small></div>
-    <div><span>All Sales</span><strong>${currency.format(report.total)}</strong><small>Includes pending offline bills</small></div>
-    <div class="report-sync-card"><span>Cloud Bills</span><strong class="synced-value">${report.syncedBills}</strong><small>Visible to owner</small></div>
-    <div class="report-sync-card"><span>Cloud Sales</span><strong class="synced-value">${currency.format(report.syncedTotal)}</strong><small>Confirmed in local cloud cache</small></div>
-    ${isMonthly ? `<div><span>Active Sales Days</span><strong>${report.activeDays}</strong><small>Days containing printed bills</small></div>
-    <div><span>Average Per Sales Day</span><strong>${currency.format(report.averageDailySales)}</strong><small>Monthly sales ÷ active days</small></div>` : ""}
-    <div class="report-sync-card"><span>Pending Upload</span><strong class="${report.pendingBills ? "pending-value" : "synced-value"}">${report.pendingBills}</strong><small>${currency.format(report.pendingTotal)} stored safely</small></div>
-    <div class="report-sync-card"><span>Connection</span><strong class="${online ? "online-value" : "pending-value"}">${online ? "Online" : "Offline"}</strong><small>${pendingSyncCount} total queued change${pendingSyncCount === 1 ? "" : "s"}</small></div>
-    <div><span>Alcoholic Drinks Sold</span><strong>${report.drinkCount}</strong><small>Beer, whisky, rum, vodka, wine, etc.</small></div>
-    <div><span>Beverages Sold</span><strong>${report.beverageCount}</strong><small>Water, soda, cold drinks and other beverages</small></div>
-    <div class="report-card-wide report-sync-card">
-      <span>Last Supabase Refresh</span>
-      <strong>${formatSyncTime(lastCloudSyncAt)}</strong>
-      <small>Use Refresh Cloud to pull the latest owner view immediately.</small>
-    </div>
+    <article class="report-hero-card report-card-wide">
+      <div>
+        <span>${isMonthly ? "Monthly Sales" : "Daily Sales"}</span>
+        <strong>${report.dateText}</strong>
+      </div>
+      <div class="report-hero-total">
+        <span>Total Sales</span>
+        <strong>${currency.format(report.total)}</strong>
+      </div>
+      <div class="report-hero-bills">
+        <span>Bills</span>
+        <strong>${report.bills}</strong>
+      </div>
+    </article>
+
+    <article class="report-kpi-card">
+      <span>Kitchen / Food Items</span>
+      <strong>${report.foodCount}</strong>
+      <small>Thali, starters, curry, rice and roti</small>
+    </article>
+    <article class="report-kpi-card">
+      <span>Alcoholic Drinks</span>
+      <strong>${report.drinkCount}</strong>
+      <small>Beer, whisky, rum, vodka, wine</small>
+    </article>
+    <article class="report-kpi-card">
+      <span>Beverages</span>
+      <strong>${report.beverageCount}</strong>
+      <small>Water, soda and cold drinks</small>
+    </article>
+    <article class="report-kpi-card ${report.pendingBills ? "report-kpi-warning" : ""}">
+      <span>Pending Upload</span>
+      <strong>${report.pendingBills}</strong>
+      <small>${currency.format(report.pendingTotal)} waiting</small>
+    </article>
+    ${monthlyKpis}
+
+    <details class="report-disclosure report-card-wide">
+      <summary>
+        <span>Cloud & sync details</span>
+        <small>${online ? "Online" : "Offline"} · ${pendingSyncCount} queued</small>
+      </summary>
+      <section class="report-details-grid">
+        <article><span>Cloud Bills</span><strong>${report.syncedBills}</strong></article>
+        <article><span>Cloud Sales</span><strong>${currency.format(report.syncedTotal)}</strong></article>
+        <article><span>Connection</span><strong>${online ? "Online" : "Offline"}</strong></article>
+        <article><span>Last Refresh</span><strong>${formatSyncTime(lastCloudSyncAt)}</strong></article>
+      </section>
+    </details>
+
     ${monthlyBreakdown}
-    <div class="report-card-wide">
-      <span>Top Items</span>
+
+    <details class="report-disclosure report-card-wide" open>
+      <summary>
+        <span>Top items</span>
+        <small>${sortedItems.length} item${sortedItems.length === 1 ? "" : "s"}</small>
+      </summary>
       <section class="top-items-list">
         ${topItems.length ? topItems.map(([name, qty], index) => `<p><strong>${index + 1}. ${name}</strong><small>${qty} sold</small></p>`).join("") : `<p class="report-empty-line"><strong>No printed sales for ${report.dateText}</strong><small>Select another period or print a completed bill</small></p>`}
       </section>
       ${sortedItems.length > 5 ? `<button class="report-toggle" type="button" data-toggle-top-items>${showAllTopItems ? "Show Top 5" : `View All ${sortedItems.length}`}</button>` : ""}
-    </div>
-    <div class="report-card-wide">
-      <span>Bills in ${report.dateText}</span>
+    </details>
+
+    <details class="report-disclosure report-card-wide">
+      <summary>
+        <span>Bill history</span>
+        <small>${report.bills} bill${report.bills === 1 ? "" : "s"}</small>
+      </summary>
       <section class="report-bill-history">
         ${billHistory.length ? billHistory.map((sale) => `
           <p class="report-bill-row">
             <strong>${sale.billNo || "Bill"}</strong>
-            <small>${formatDate(sale.date)} · ${sale.table || "No table"}${sale.syncState === "pending" ? " · Pending upload" : ""}</small>
+            <small>${formatDate(sale.date)} · ${sale.table || "No table"}${sale.syncState === "pending" ? " · Pending" : ""}</small>
             <b>${currency.format(sale.grandTotal)}</b>
-          </p>`).join("") : `<p class="report-empty-line"><strong>No bills found</strong><small>Try another date/month or refresh cloud data</small></p>`}
+          </p>`).join("") : `<p class="report-empty-line"><strong>No bills found</strong><small>Try another date/month or refresh cloud</small></p>`}
       </section>
-      ${report.sales.length > 100 ? `<small>Showing the latest 100 of ${report.sales.length} bills.</small>` : ""}
-    </div>`;
+      ${report.sales.length > 50 ? `<small>Showing the latest 50 of ${report.sales.length} bills.</small>` : ""}
+    </details>`;
 }
-
 function renderMenuTable() {
   const query = managerSearchQuery.trim().toLowerCase();
   const visibleItems = query
@@ -1983,6 +2073,8 @@ menuTable.addEventListener("click", (event) => {
     menuItemName.focus();
   }
   if (deleteId) {
+    const itemToDelete = items.find((menuItem) => menuItem.id === deleteId);
+    if (!window.confirm(`Delete ${itemToDelete?.name || "this menu item"}?`)) return;
     items = items.filter((menuItem) => menuItem.id !== deleteId);
     quantities.delete(deleteId);
     saveMenu();
@@ -2149,6 +2241,21 @@ salesReport.addEventListener("click", (event) => {
   renderSalesReport();
 });
 
+function openReportPicker(input) {
+  if (!input) return;
+  try {
+    if (typeof input.showPicker === "function") input.showPicker();
+    else input.focus();
+  } catch {
+    input.focus();
+  }
+}
+
+openReportDatePickerButton?.addEventListener("click", () => openReportPicker(reportDateFilter));
+openReportMonthPickerButton?.addEventListener("click", () => openReportPicker(reportMonthFilter));
+reportDateFilter?.addEventListener("click", () => openReportPicker(reportDateFilter));
+reportMonthFilter?.addEventListener("click", () => openReportPicker(reportMonthFilter));
+
 reportPeriodSelect?.addEventListener("change", () => {
   showAllTopItems = false;
   updateReportPeriodControls();
@@ -2187,7 +2294,7 @@ window.addEventListener("beforeinstallprompt", (event) => {
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
   if (installAppButton) installAppButton.hidden = true;
-  saveStatus.textContent = "Guru POS installed. It can now open like a mobile app.";
+  saveStatus.textContent = "Hotel Guru Billing installed. It can now open like a mobile app.";
 });
 
 window.addEventListener("online", () => {
@@ -2206,6 +2313,7 @@ window.addEventListener("guru-queue-change", updateSyncStatus);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     updateSyncStatus();
+    serviceWorkerRegistration?.update().catch(() => {});
     if (navigator.onLine) syncAll();
   }
 });
@@ -2220,22 +2328,59 @@ gstEnabled.addEventListener("change", () => {
 });
 billDate.addEventListener("change", renderSalesReport);
 
+function showAppUpdate(worker) {
+  if (!appUpdateBar || !worker) return;
+  pendingServiceWorker = worker;
+  appUpdateBar.hidden = false;
+}
+
+function hideAppUpdate() {
+  if (appUpdateBar) appUpdateBar.hidden = true;
+}
+
+updateAppNowButton?.addEventListener("click", () => {
+  const worker = pendingServiceWorker || serviceWorkerRegistration?.waiting;
+  if (!worker) {
+    location.reload();
+    return;
+  }
+  reloadingForAppUpdate = true;
+  updateAppNowButton.disabled = true;
+  updateAppNowButton.textContent = "Updating...";
+  worker.postMessage({ type: "SKIP_WAITING" });
+});
+
+updateLaterButton?.addEventListener("click", hideAppUpdate);
+
 async function registerPosServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  try {
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    if (registration.waiting) saveStatus.textContent = "An app update is ready. Reopen Guru POS after finishing the current bill.";
-    registration.addEventListener("updatefound", () => {
-      const worker = registration.installing;
-      worker?.addEventListener("statechange", () => {
-        if (worker.state === "installed" && navigator.serviceWorker.controller) {
-          saveStatus.textContent = "A new Guru POS version is ready. Reopen after finishing the current bill.";
-        }
-      });
-    });
-  } catch (error) {
-    console.error("PWA service worker registration failed", error);
+
+  const isLocalDevelopment = ["localhost", "127.0.0.1"].includes(location.hostname);
+  const forceLocalPwa = new URLSearchParams(location.search).get("pwa") === "1";
+  if (isLocalDevelopment && !forceLocalPwa) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.filter((name) => name.startsWith("guru-pos-") || name.startsWith("hotel-guru-billing-")).map((name) => caches.delete(name)));
+      }
+      if (navigator.serviceWorker.controller && sessionStorage.getItem("guruLocalDevReloadV13") !== "1") {
+        sessionStorage.setItem("guruLocalDevReloadV13", "1");
+        location.replace(`/?dev=13&t=${Date.now()}`);
+      }
+      console.info("Hotel Guru Billing v13 local development mode: service-worker cache disabled. Use ?pwa=1 to test offline PWA mode.");
+    } catch (error) {
+      console.warn("Could not clear the local development service worker", error);
+    }
+    return;
   }
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!reloadingForAppUpdate) return;
+    reloadingForAppUpdate = false;
+    location.reload();
+  });
 
   navigator.serviceWorker.addEventListener("message", async (event) => {
     if (event.data?.type === "GURU_SYNC_COMPLETE") {
@@ -2244,7 +2389,28 @@ async function registerPosServiceWorker() {
       if (navigator.onLine) syncSalesFromSupabase();
     }
     if (event.data?.type === "GURU_SYNC_FAILED") updateSyncStatus();
+    if (event.data?.type === "APP_ACTIVATED" && reloadingForAppUpdate) {
+      reloadingForAppUpdate = false;
+      location.reload();
+    }
   });
+
+  try {
+    serviceWorkerRegistration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    if (serviceWorkerRegistration.waiting) showAppUpdate(serviceWorkerRegistration.waiting);
+
+    serviceWorkerRegistration.addEventListener("updatefound", () => {
+      const worker = serviceWorkerRegistration.installing;
+      worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) showAppUpdate(worker);
+      });
+    });
+
+    serviceWorkerRegistration.update().catch(() => {});
+    window.setInterval(() => serviceWorkerRegistration?.update().catch(() => {}), 5 * 60 * 1000);
+  } catch (error) {
+    console.error("PWA service worker registration failed", error);
+  }
 }
 
 async function initializeApplication() {
@@ -2254,6 +2420,7 @@ async function initializeApplication() {
   updateReportPeriodControls();
   syncDrinkTypeField();
   migrateRunningBillNumbers();
+  migrateGstDefaultOff();
   initializeTableOrders();
   renderItems();
   renderMenuTable();

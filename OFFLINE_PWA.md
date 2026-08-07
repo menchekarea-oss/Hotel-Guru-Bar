@@ -1,4 +1,4 @@
-# Guru POS — Online + Offline Billing
+# Hotel Guru Billing — Online + Offline Billing
 
 This version is an installable Progressive Web App (PWA). Billing continues when the internet fails, and finalized sales are uploaded to Supabase when connectivity returns.
 
@@ -38,6 +38,7 @@ Deploy the complete folder. These files must stay at the project root:
 - `manifest.webmanifest`
 - `styles.css`
 - `report-ui.css`
+- `app-polish.css`
 - `thermal-print.css`
 - `offline.html`
 - `icons/`
@@ -52,13 +53,13 @@ Vercel provides HTTPS, which is required for an installable PWA.
 1. Open the Vercel URL in Chrome.
 2. Wait until the status bar says **Online**.
 3. Press **Install App**, or open Chrome menu → **Install app**.
-4. Open Guru POS from the home screen.
+4. Open Hotel Guru Billing from the home screen.
 
 ### iPhone
 
 1. Open the Vercel URL in Safari.
 2. Tap **Share** → **Add to Home Screen**.
-3. Open Guru POS from the new home-screen icon.
+3. Open Hotel Guru Billing from the new home-screen icon.
 
 ## Offline test
 
@@ -92,6 +93,7 @@ The report distinguishes:
 - **Cloud Bills / Cloud Sales** — data already confirmed in the local Supabase cache and visible remotely
 - **Pending Upload** — sales safe on the current device but not uploaded yet
 - **All Bills / All Sales** — cloud data plus pending offline data on the current device
+- **Kitchen / Food Items Sold** — thali, snacks, starters, curry, rice, roti and other food items
 - **Alcoholic Drinks Sold** — only beer, whisky/whiskey, rum, vodka, wine, gin, brandy, tequila and other menu items categorized as Drinks/liquor
 - **Beverages Sold** — only water, soda, cold drinks, tea and other non-alcoholic items categorized as Beverages
 - **Daily calendar history** — select any previous report date or move with Previous/Next
@@ -101,6 +103,7 @@ For secure production use, protect owner reports and menu editing with Supabase 
 
 ## Important operational rules
 
+- GST is off by default for every new bill. Turn it on manually only when required; the GST row is hidden while off.
 - Only **Print** finalizes the current sale and adds it to Sales Report/Supabase. **Save Bill** only downloads or writes the PDF/JSON file and keeps the running table open; it does not count as a sale.
 - Do not clear browser/app site data while sales are pending.
 - Check that the pending count is zero before changing phones or uninstalling the app.

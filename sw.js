@@ -1,7 +1,8 @@
 "use strict";
 
-const APP_CACHE = "guru-pos-app-v9";
-const IMAGE_CACHE = "guru-pos-images-v1";
+const APP_VERSION = "13.0.0";
+const APP_CACHE = "hotel-guru-billing-app-v13";
+const IMAGE_CACHE = "hotel-guru-billing-images-v1";
 const DB_NAME = "guru-pos-offline";
 const DB_VERSION = 1;
 const SALES_STORE = "sales";
@@ -16,10 +17,11 @@ const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
-  "/report-ui.css?v=8",
-  "/thermal-print.css?v=9",
+  "/report-ui.css?v=13",
+  "/app-polish.css?v=13",
+  "/thermal-print.css?v=13",
   "/offline-sync.js",
-  "/script.js?v=8",
+  "/script.js?v=13",
   "/manifest.webmanifest",
   "/offline.html",
   "/assets/bar-background.webp",
@@ -29,23 +31,20 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(APP_CACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(APP_CACHE).then((cache) => cache.addAll(APP_SHELL)));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((names) => Promise.all(
-        names
-          .filter((name) => ![APP_CACHE, IMAGE_CACHE].includes(name))
-          .map((name) => caches.delete(name))
-      ))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(
+      names
+        .filter((name) => ![APP_CACHE, IMAGE_CACHE].includes(name))
+        .map((name) => caches.delete(name))
+    );
+    await self.clients.claim();
+    await notifyClients({ type: "APP_ACTIVATED", version: APP_VERSION });
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -117,6 +116,9 @@ self.addEventListener("message", (event) => {
     event.waitUntil(syncQueuedChanges());
   }
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+  if (event.data?.type === "GET_VERSION") {
+    event.source?.postMessage({ type: "APP_VERSION", version: APP_VERSION });
+  }
 });
 
 function openDatabase() {

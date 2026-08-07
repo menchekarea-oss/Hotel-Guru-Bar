@@ -1,0 +1,7 @@
+HOTEL GURU BILLING BUILD 13.0.0
+
+Visible badge in the app: v13
+Local server port from RUN_LOCAL_V13.bat: 8091
+Local development service-worker cache: disabled by default
+Offline PWA local test URL: http://localhost:8091/?pwa=1
+Production PWA cache: hotel-guru-billing-app-v13

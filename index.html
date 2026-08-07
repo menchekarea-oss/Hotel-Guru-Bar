@@ -4,19 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#17151a" />
-    <meta name="application-name" content="Guru POS" />
+    <meta name="application-name" content="Hotel Guru Billing" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Guru POS" />
+    <meta name="apple-mobile-web-app-title" content="Hotel Guru Billing" />
     <meta name="description" content="Online and offline restaurant billing application" />
-    <title>Guru Bar & Restaurant POS</title>
+    <title>Hotel Guru Billing</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon-192.png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="/report-ui.css?v=8" />
-    <link rel="stylesheet" href="/thermal-print.css?v=9" media="print" />
+    <link rel="stylesheet" href="/report-ui.css?v=13" />
+    <link rel="stylesheet" href="/app-polish.css?v=13" />
+    <link rel="stylesheet" href="/thermal-print.css?v=13" media="print" />
   </head>
   <body>
     <img class="site-bg-image" src="/assets/bar-background.webp" alt="" aria-hidden="true" />
@@ -41,6 +42,7 @@
           </div>
           <p class="sync-detail" id="syncDetail">Local billing storage is ready.</p>
           <div class="sync-actions">
+            <span class="app-build-badge" id="appBuildBadge" title="Current application build">v13</span>
             <button id="installApp" type="button" hidden>Install App</button>
             <button id="syncNow" type="button">Sync Now</button>
           </div>
@@ -95,7 +97,7 @@
           <label class="gst-apply-field">
             GST
             <span class="toggle-row">
-              <input id="gstEnabled" type="checkbox" checked />
+              <input id="gstEnabled" type="checkbox" />
               <span>Apply</span>
             </span>
           </label>
@@ -257,11 +259,17 @@
             </label>
             <label class="report-date-filter" id="reportDateField">
               Report date
-              <input id="reportDateFilter" type="date" />
+              <span class="report-picker-control">
+                <input id="reportDateFilter" type="date" />
+                <button id="openReportDatePicker" type="button" title="Open date calendar" aria-label="Open report date calendar">📅</button>
+              </span>
             </label>
             <label class="report-date-filter" id="reportMonthField" hidden style="display: none">
               Report month
-              <input id="reportMonthFilter" type="month" />
+              <span class="report-picker-control">
+                <input id="reportMonthFilter" type="month" />
+                <button id="openReportMonthPicker" type="button" title="Open month calendar" aria-label="Open report month calendar">📅</button>
+              </span>
             </label>
             <div class="report-calendar-nav" aria-label="Previous and next report period">
               <button id="reportPrevious" type="button" title="Previous period">← Previous</button>
@@ -294,10 +302,22 @@
       </section>
     </main>
 
+    <aside class="app-update-bar" id="appUpdateBar" aria-live="polite" hidden>
+      <div class="app-update-icon" aria-hidden="true">↻</div>
+      <div class="app-update-copy">
+        <strong>New Hotel Guru Billing update available</strong>
+        <small>Your running tables are saved. Update now to use the latest version.</small>
+      </div>
+      <div class="app-update-actions">
+        <button id="updateLater" type="button">Later</button>
+        <button id="updateAppNow" type="button">Update Now</button>
+      </div>
+    </aside>
+
     <section id="printReceipt" aria-hidden="true"></section>
 
     <script src="offline-sync.js"></script>
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=13"></script>
   </body>
 </html>
 

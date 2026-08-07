@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Guru Bar & Restaurant POS",
-  "short_name": "Guru POS",
+  "name": "Hotel Guru Billing",
+  "short_name": "Hotel Guru Billing",
   "description": "Online and offline restaurant billing application",
   "lang": "en-IN",
   "start_url": "/",

@@ -1,0 +1,72 @@
+{
+  "reportNo": "Daily-Sales-2026-08-04",
+  "periodType": "daily",
+  "date": "2026-08-04",
+  "dateText": "04 Aug 2026",
+  "bills": 1,
+  "total": 510,
+  "syncedBills": 1,
+  "pendingBills": 0,
+  "syncedTotal": 510,
+  "pendingTotal": 0,
+  "drinkCount": 0,
+  "beverageCount": 0,
+  "bottleCount": 0,
+  "topItems": [
+    [
+      "Chicken Fry",
+      2
+    ],
+    [
+      "Veg Thali",
+      1
+    ]
+  ],
+  "sales": [
+    {
+      "date": "2026-08-04",
+      "items": [
+        {
+          "id": "veg-thali",
+          "kind": "food",
+          "name": "Veg Thali",
+          "color": "#b84a2a",
+          "photo": "https://images.pexels.com/photos/29148133/pexels-photo-29148133.jpeg?auto=compress&cs=tinysrgb&w=240&h=180&fit=crop",
+          "price": 150,
+          "category": "Thali",
+          "quantity": 1,
+          "subcategory": ""
+        },
+        {
+          "id": "chicken-fry",
+          "kind": "food",
+          "name": "Chicken Fry",
+          "color": "#b84a2a",
+          "photo": "https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg?auto=compress&cs=tinysrgb&w=240&h=180&fit=crop",
+          "price": 180,
+          "category": "Starter",
+          "quantity": 2,
+          "subcategory": ""
+        }
+      ],
+      "table": "Table 1",
+      "billNo": "GBR-002",
+      "saleId": "sale-6cdbff08-8908-4953-933b-d0c35f773fe5",
+      "gstRate": 5,
+      "savedAt": "2026-08-07T08:53:36.811Z",
+      "customer": "",
+      "dateText": "04 Aug 2026",
+      "deviceId": "ED8S",
+      "subtotal": 510,
+      "gstAmount": 0,
+      "syncState": "synced",
+      "grandTotal": 510,
+      "gstEnabled": false,
+      "serviceCharge": 0,
+      "syncedAt": "2026-08-07T15:10:57.726Z",
+      "queuedAt": null
+    }
+  ],
+  "dailyBreakdown": [],
+  "savedAt": "2026-08-07T15:34:32.970Z"
+}

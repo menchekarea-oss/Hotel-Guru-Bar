@@ -1,0 +1,43 @@
+{
+  "billNo": "GBR-002",
+  "date": "2026-05-19",
+  "dateText": "19 May 2026",
+  "table": "1",
+  "customer": "",
+  "items": [
+    {
+      "id": "tuborg",
+      "name": "Tuborg Beer",
+      "price": 190,
+      "category": "Drinks",
+      "kind": "liquor",
+      "color": "#2f6f55",
+      "quantity": 1
+    },
+    {
+      "id": "oldmonk",
+      "name": "Old Monk Rum 180ml",
+      "price": 220,
+      "category": "Drinks",
+      "kind": "liquor",
+      "color": "#5a2519",
+      "quantity": 1
+    },
+    {
+      "id": "mcwhisky",
+      "name": "McDowell's Whisky 180ml",
+      "price": 260,
+      "category": "Drinks",
+      "kind": "liquor",
+      "color": "#b66a2f",
+      "quantity": 1
+    }
+  ],
+  "subtotal": 670,
+  "serviceCharge": 34,
+  "gstEnabled": false,
+  "gstRate": 5,
+  "gstAmount": 0,
+  "grandTotal": 704,
+  "savedAt": "2026-05-19T13:47:42.235Z"
+}

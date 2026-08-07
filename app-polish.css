@@ -1,0 +1,284 @@
+/* Final interaction and motion layer for Hotel Guru Billing v10. */
+:root {
+  --ui-ease: cubic-bezier(.2, .8, .2, 1);
+  --ui-focus: 0 0 0 3px rgba(194, 123, 43, 0.24);
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  transition:
+    transform 150ms var(--ui-ease),
+    box-shadow 180ms var(--ui-ease),
+    border-color 180ms var(--ui-ease),
+    background-color 180ms var(--ui-ease),
+    opacity 180ms var(--ui-ease) !important;
+  touch-action: manipulation;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.55 !important;
+  transform: none !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: none !important;
+  box-shadow: var(--ui-focus) !important;
+}
+
+.item-card {
+  transition:
+    transform 180ms var(--ui-ease),
+    box-shadow 180ms var(--ui-ease),
+    border-color 180ms var(--ui-ease),
+    background-color 180ms var(--ui-ease) !important;
+}
+
+.item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(31, 32, 40, 0.11) !important;
+}
+
+.item-card.has-quantity {
+  border-color: rgba(194, 123, 43, 0.72) !important;
+  background: linear-gradient(180deg, rgba(255, 248, 237, 0.98), #fff4e4) !important;
+  box-shadow: 0 0 0 2px rgba(194, 123, 43, 0.1) !important;
+}
+
+.item-card.has-quantity .qty-row input {
+  border-color: #c27b2b !important;
+  color: #8a3f13 !important;
+}
+
+.admin-modal.modal-open {
+  animation: modalEnter 220ms var(--ui-ease) both;
+}
+
+.owner-pin-card {
+  animation: modalEnter 220ms var(--ui-ease) both;
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.save-status:not(:empty) {
+  padding: 9px 10px;
+  border: 1px solid rgba(104, 199, 150, 0.22);
+  border-radius: 7px;
+  background: rgba(104, 199, 150, 0.08);
+}
+
+.app-update-bar {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 5000;
+  width: min(430px, calc(100vw - 36px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(240, 195, 125, 0.3);
+  border-radius: 12px;
+  background: #17151a;
+  color: #fff8ed;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+  animation: updateEnter 240ms var(--ui-ease) both;
+}
+
+.app-update-bar[hidden] {
+  display: none !important;
+}
+
+.app-update-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(194, 123, 43, 0.16);
+  color: #f0c37d;
+  font-size: 21px;
+}
+
+.app-update-copy {
+  min-width: 0;
+}
+
+.app-update-copy strong,
+.app-update-copy small {
+  display: block;
+}
+
+.app-update-copy strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.app-update-copy small {
+  margin-top: 3px;
+  color: rgba(255, 248, 237, 0.64);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.app-update-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.app-update-actions button {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(240, 195, 125, 0.25);
+  border-radius: 7px;
+  background: #27242a;
+  color: #fff8ed;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.app-update-actions #updateAppNow {
+  background: #c27b2b;
+  color: #17100b;
+}
+
+@keyframes updateEnter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 650px) {
+  .item-card:hover {
+    transform: none;
+  }
+
+  .app-update-bar {
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .app-update-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .app-update-bar {
+    display: none !important;
+  }
+}
+
+/* Balanced receipt action buttons (v11) */
+.bill-bottom-actions {
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+.bill-bottom-actions #printBillBottom,
+.bill-bottom-actions #saveBillBottom {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+.bill-bottom-actions #printBillBottom {
+  border: 1px solid #d0903f !important;
+  background: #211f24 !important;
+  color: #fff8ed !important;
+}
+
+.bill-bottom-actions #printBillBottom:hover:not(:disabled) {
+  border-color: #e2ad63 !important;
+  background: #33271e !important;
+  color: #f0c37d !important;
+}
+
+.bill-bottom-actions #saveBillBottom {
+  border: 1px solid #d6923d !important;
+  background: linear-gradient(180deg, #e4aa58, #c27b2b) !important;
+  color: #17100b !important;
+}
+
+.bill-bottom-actions #saveBillBottom:hover:not(:disabled) {
+  border-color: #efbd76 !important;
+  background: linear-gradient(180deg, #efbd76, #d38a35) !important;
+  color: #110c08 !important;
+}
+
+.bill-bottom-actions #printBillBottom:active:not(:disabled),
+.bill-bottom-actions #saveBillBottom:active:not(:disabled) {
+  filter: brightness(0.94) !important;
+}
+
+/* Visible build marker for troubleshooting */
+.app-build-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(194, 123, 43, 0.35);
+  border-radius: 999px;
+  background: rgba(194, 123, 43, 0.1);
+  color: #7a3b12;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 767px) {
+  .app-build-badge {
+    min-height: 26px;
+    color: #f0c37d;
+  }
+}

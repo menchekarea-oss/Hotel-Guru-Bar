@@ -273,13 +273,25 @@ const server = http.createServer((req, res) => {
       res.end("Not found");
       return;
     }
-    res.writeHead(200, { "Content-Type": types[path.extname(filePath)] || "application/octet-stream" });
+    res.writeHead(200, {
+      "Content-Type": types[path.extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "X-Hotel-Guru-Billing-Build": "13.0.0"
+    });
     res.end(data);
   });
 });
 
 server.listen(port, "0.0.0.0", () => {
-  console.log(`Hotel Guru billing app running at http://0.0.0.0:${port}`);
-  console.log(`Bills will be saved in ${billsDir}`);
-  console.log(`SQLite database will be saved at ${dbPath}`);
+  console.log("============================================================");
+  console.log(" Hotel Guru Billing BUILD 13.0.0 — LOCAL NO-CACHE DEVELOPMENT SERVER");
+  console.log("============================================================");
+  console.log(`Open in browser: http://localhost:${port}`);
+  console.log(`Project folder: ${root}`);
+  console.log(`Bills folder: ${billsDir}`);
+  console.log(`SQLite database: ${dbPath}`);
+  console.log("Local service-worker cache is disabled by default.");
+  console.log(`For offline PWA testing use: http://localhost:${port}/?pwa=1`);
 });

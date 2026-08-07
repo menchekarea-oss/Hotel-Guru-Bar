@@ -4,7 +4,7 @@ This build adds a simple local password lock to the Sales Report interface.
 
 ## First-time setup
 
-1. Open Guru POS on the billing device.
+1. Open Hotel Guru Billing on the billing device.
 2. Press **Locked Sales / Owner only** or **Locked Report**.
 3. Because no password exists yet, the app shows **Set Owner Password**.
 4. Enter at least 4 characters.

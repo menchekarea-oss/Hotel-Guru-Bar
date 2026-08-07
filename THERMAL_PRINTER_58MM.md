@@ -4,7 +4,7 @@ The app now declares a 58 mm page and keeps receipt content within the approxima
 
 ## Application files
 
-Keep `thermal-print.css` beside `index.html`. The page loads it as `thermal-print.css?v=9` only while printing.
+Keep `thermal-print.css` beside `index.html`. The page loads its current version only while printing.
 
 ## Windows printer preferences
 

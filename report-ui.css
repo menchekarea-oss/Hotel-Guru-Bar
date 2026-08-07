@@ -1,4 +1,4 @@
-/* Guru POS owner report controls — loaded after the main stylesheet. */
+/* Hotel Guru Billing owner report controls — loaded after the main stylesheet. */
 .owner-pin-fields {
   display: grid !important;
   gap: 14px !important;
@@ -224,5 +224,348 @@
   .report-period-row small,
   .report-bill-row small {
     grid-column: 1 / -1 !important;
+  }
+}
+
+/* Compact report cards (v10) */
+.report-panel .report-grid {
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.report-hero-card,
+.report-kpi-card,
+.report-disclosure {
+  min-width: 0;
+  border: 1px solid rgba(31, 32, 40, 0.11);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 24px rgba(31, 32, 40, 0.07);
+}
+
+.report-hero-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(190px, auto) minmax(90px, auto);
+  gap: 18px;
+  align-items: center;
+  padding: 18px 20px;
+  background: linear-gradient(100deg, #17151a, #302018) !important;
+  color: #fff8ed;
+}
+
+.report-hero-card > div {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.report-hero-card span,
+.report-kpi-card span,
+.report-disclosure summary span,
+.report-details-grid span {
+  color: #766b61;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.report-hero-card span {
+  color: rgba(255, 248, 237, 0.64) !important;
+}
+
+.report-hero-card strong {
+  color: #ffffff !important;
+  font-size: 21px !important;
+  line-height: 1.1;
+}
+
+.report-hero-total strong {
+  color: #f0c37d !important;
+  font-size: 30px !important;
+}
+
+.report-hero-bills {
+  text-align: right;
+}
+
+.report-kpi-card {
+  display: grid;
+  gap: 5px;
+  min-height: 105px;
+  padding: 15px;
+}
+
+.report-kpi-card strong {
+  color: #1f2028 !important;
+  font-size: 25px !important;
+  line-height: 1.05;
+}
+
+.report-kpi-card small {
+  color: #786e65;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.report-kpi-warning {
+  border-color: rgba(155, 47, 32, 0.34);
+  background: #fff5f1;
+}
+
+.report-kpi-warning strong {
+  color: #9b2f20 !important;
+}
+
+.report-disclosure {
+  overflow: hidden;
+  background: #17191f;
+  color: #fff8ed;
+}
+
+.report-disclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 52px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.report-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.report-disclosure summary::after {
+  content: "+";
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(240, 195, 125, 0.28);
+  border-radius: 50%;
+  color: #f0c37d;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.report-disclosure[open] summary::after {
+  content: "−";
+}
+
+.report-disclosure summary span {
+  color: #fff8ed !important;
+}
+
+.report-disclosure summary small {
+  margin-left: auto;
+  color: rgba(255, 248, 237, 0.58);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.report-disclosure > section,
+.report-disclosure > button,
+.report-disclosure > small {
+  margin-right: 16px;
+  margin-left: 16px;
+}
+
+.report-disclosure > section {
+  padding-bottom: 14px;
+  border-top: 1px solid rgba(255, 248, 237, 0.09);
+}
+
+.report-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.report-details-grid article {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 248, 237, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.report-details-grid span {
+  color: rgba(255, 248, 237, 0.55) !important;
+}
+
+.report-details-grid strong {
+  overflow-wrap: anywhere;
+  color: #ffffff !important;
+  font-size: 16px !important;
+}
+
+@media (max-width: 900px) {
+  .report-panel .report-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .report-details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .report-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .report-calendar-nav {
+    grid-column: 1 / -1 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .report-filter-bar > #reportSyncNow {
+    grid-column: 1 / -1;
+  }
+
+  .report-panel .report-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .report-hero-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .report-hero-card > div:first-child {
+    grid-column: 1 / -1;
+    padding-bottom: 9px !important;
+    border-bottom: 1px solid rgba(255, 248, 237, 0.12) !important;
+  }
+
+  .report-hero-total strong {
+    font-size: 24px !important;
+  }
+
+  .report-hero-bills {
+    text-align: right;
+  }
+
+  .report-kpi-card {
+    min-height: 88px;
+    padding: 12px;
+  }
+
+  .report-kpi-card strong {
+    font-size: 21px !important;
+  }
+
+  .report-kpi-card small {
+    display: none;
+  }
+
+  .report-disclosure summary {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
+
+  .report-disclosure > section,
+  .report-disclosure > button,
+  .report-disclosure > small {
+    margin-right: 12px;
+    margin-left: 12px;
+  }
+
+  .report-details-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .report-filter-bar,
+  .report-panel .report-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .report-calendar-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .report-hero-card,
+  .report-card-wide,
+  .report-disclosure {
+    grid-column: 1 !important;
+  }
+}
+
+/* Visible calendar controls and tighter report totals (v11) */
+.report-picker-control {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 44px !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  border: 1px solid rgba(31, 32, 40, 0.18) !important;
+  border-radius: 7px !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+}
+
+.report-picker-control input {
+  min-width: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color-scheme: light !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.report-picker-control input::-webkit-calendar-picker-indicator {
+  display: block !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+
+.report-picker-control button {
+  width: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 1px solid rgba(31, 32, 40, 0.14) !important;
+  border-radius: 0 !important;
+  background: #fff4e4 !important;
+  color: #7a3b12 !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+}
+
+.report-hero-card {
+  grid-template-columns: minmax(180px, 280px) minmax(160px, 220px) 90px !important;
+  justify-content: start !important;
+  column-gap: 16px !important;
+}
+
+.report-hero-bills {
+  text-align: left !important;
+}
+
+@media (max-width: 650px) {
+  .report-hero-card {
+    grid-template-columns: minmax(0, 1fr) 84px !important;
+    justify-content: stretch !important;
+  }
+
+  .report-hero-bills {
+    text-align: right !important;
   }
 }

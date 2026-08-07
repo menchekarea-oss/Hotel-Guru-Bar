@@ -11,7 +11,7 @@ Sales enter reports only when **Print** is pressed. **Save Bill** only saves the
 ## Daily report and previous dates
 
 1. Choose **Daily Sales** under Report View.
-2. Press the Report Date field to open the calendar.
+2. Press anywhere in the Report Date field or tap the visible calendar button to open the calendar.
 3. Select any previous date.
 4. Use **Previous**, **Today**, and **Next** for quick navigation.
 5. Press **Refresh Cloud** while online to download earlier sales from Supabase.
@@ -27,15 +27,18 @@ The selected date shows totals, cloud/pending figures, alcoholic drinks, beverag
 
 Monthly report includes:
 
-- Total bills and sales
-- Cloud and pending sales
-- Active sales days
-- Average sales per active day
+- A compact total-sales and bill-count summary
+- Kitchen / Food Items Sold
 - Alcoholic Drinks Sold
 - Beverages Sold
-- Day-by-day sales breakdown
-- Top items for the month
-- Up to the latest 100 individual bills in the month
+- Pending uploads
+- Active sales days and average sales per active day
+- Collapsible cloud/sync details
+- Collapsible day-by-day sales breakdown
+- Top items
+- Collapsible history for the latest 50 bills in the selected period
+
+On mobile, nonessential cloud details and bill history remain collapsed until the owner taps them.
 
 ## Previous history
 

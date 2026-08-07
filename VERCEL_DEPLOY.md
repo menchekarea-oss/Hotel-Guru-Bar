@@ -1,4 +1,4 @@
-# Deploy the Online + Offline Guru POS to Vercel
+# Deploy the Online + Offline Hotel Guru Billing to Vercel
 
 ## Deploy
 
@@ -13,7 +13,7 @@ Vercel automatically provides HTTPS, required by the service worker and PWA inst
 
 ## Required files
 
-Do not omit `sw.js`, `offline-sync.js`, `report-ui.css`, `thermal-print.css`, `manifest.webmanifest`, `offline.html`, `icons/`, or `assets/`.
+Do not omit `sw.js`, `offline-sync.js`, `report-ui.css`, `app-polish.css`, `thermal-print.css`, `manifest.webmanifest`, `offline.html`, `icons/`, or `assets/`.
 
 ## First mobile setup
 

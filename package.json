@@ -1,6 +1,6 @@
 {
-  "name": "guru-bar-restaurant-billing",
-  "version": "1.0.0",
+  "name": "hotel-guru-billing",
+  "version": "13.0.0",
   "private": true,
   "scripts": {
     "dev": "node server.js",

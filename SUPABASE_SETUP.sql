@@ -1,4 +1,4 @@
--- Guru POS minimum tables for online/offline synchronization.
+-- Hotel Guru Billing minimum tables for online/offline synchronization.
 -- If your current menu_items and sales tables already work, do not recreate them.
 
 create table if not exists public.menu_items (
