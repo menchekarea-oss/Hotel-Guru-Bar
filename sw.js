@@ -1,7 +1,7 @@
 "use strict";
 
-const APP_VERSION = "13.0.0";
-const APP_CACHE = "hotel-guru-billing-app-v13";
+const APP_VERSION = "14.0.0";
+const APP_CACHE = "hotel-guru-billing-app-v14";
 const IMAGE_CACHE = "hotel-guru-billing-images-v1";
 const DB_NAME = "guru-pos-offline";
 const DB_VERSION = 1;
@@ -17,11 +17,11 @@ const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
-  "/report-ui.css?v=13",
-  "/app-polish.css?v=13",
-  "/thermal-print.css?v=13",
+  "/report-ui.css?v=14",
+  "/app-polish.css?v=14",
+  "/thermal-print.css?v=14",
   "/offline-sync.js",
-  "/script.js?v=13",
+  "/script.js?v=14",
   "/manifest.webmanifest",
   "/offline.html",
   "/assets/bar-background.webp",

@@ -278,7 +278,7 @@ const server = http.createServer((req, res) => {
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       Pragma: "no-cache",
       Expires: "0",
-      "X-Hotel-Guru-Billing-Build": "13.0.0"
+      "X-Hotel-Guru-Billing-Build": "14.0.0"
     });
     res.end(data);
   });
@@ -286,7 +286,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, "0.0.0.0", () => {
   console.log("============================================================");
-  console.log(" Hotel Guru Billing BUILD 13.0.0 — LOCAL NO-CACHE DEVELOPMENT SERVER");
+  console.log(" Hotel Guru Billing BUILD 14.0.0 — LOCAL NO-CACHE DEVELOPMENT SERVER");
   console.log("============================================================");
   console.log(`Open in browser: http://localhost:${port}`);
   console.log(`Project folder: ${root}`);

@@ -1,6 +1,6 @@
 # Windows 58 mm Thermal Printer Setup
 
-The app now declares a 58 mm page and keeps receipt content within the approximately 48 mm printable area used by most POS-58 printers. This prevents the right-side amount column from being cut off.
+The app declares a 58 mm page but uses a left-aligned 46 mm receipt box with about 44 mm of inner content width. Extra right padding keeps every digit inside the narrower printable area reported by many Windows POS-58 drivers.
 
 ## Application files
 
@@ -48,7 +48,7 @@ Some POS printer drivers supply their own continuous-roll form. Prefer that form
 ## Expected preview
 
 - The white page is 58 mm wide.
-- The receipt content is centered in a safe 48 mm printable column.
+- The receipt content is left-aligned inside a safe 46 mm box with extra space reserved on the right.
 - Item names may wrap.
 - Prices and totals remain completely visible on the right.
 - No browser header, footer, URL, or page number appears.

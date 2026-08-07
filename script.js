@@ -2365,11 +2365,11 @@ async function registerPosServiceWorker() {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.filter((name) => name.startsWith("guru-pos-") || name.startsWith("hotel-guru-billing-")).map((name) => caches.delete(name)));
       }
-      if (navigator.serviceWorker.controller && sessionStorage.getItem("guruLocalDevReloadV13") !== "1") {
-        sessionStorage.setItem("guruLocalDevReloadV13", "1");
-        location.replace(`/?dev=13&t=${Date.now()}`);
+      if (navigator.serviceWorker.controller && sessionStorage.getItem("guruLocalDevReloadV14") !== "1") {
+        sessionStorage.setItem("guruLocalDevReloadV14", "1");
+        location.replace(`/?dev=14&t=${Date.now()}`);
       }
-      console.info("Hotel Guru Billing v13 local development mode: service-worker cache disabled. Use ?pwa=1 to test offline PWA mode.");
+      console.info("Hotel Guru Billing v14 local development mode: service-worker cache disabled. Use ?pwa=1 to test offline PWA mode.");
     } catch (error) {
       console.warn("Could not clear the local development service worker", error);
     }
